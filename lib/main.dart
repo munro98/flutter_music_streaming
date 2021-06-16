@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart';
-import 'package:audioplayers/audioplayers.dart';
+//import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart';
 
-import 'player_widget.dart';
+import 'package:assets_audio_player/assets_audio_player.dart';
+
+//import 'player_widget.dart';
 
 import 'Track.dart';
 import 'AppDatabase.dart';
@@ -44,8 +46,9 @@ class CategoryRoute extends StatefulWidget {
 class _CategoryRouteState extends State<CategoryRoute> {
 
   
-  AudioPlayer advancedPlayer = AudioPlayer();
-  AudioCache audioCache = AudioCache(fixedPlayer: AudioPlayer());
+  //AudioPlayer advancedPlayer = AudioPlayer();
+  //AudioCache audioCache = AudioCache(fixedPlayer: AudioPlayer());
+  AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
 
   String? localFilePath;
 
@@ -96,7 +99,34 @@ class _CategoryRouteState extends State<CategoryRoute> {
   void _playTrack(String path) {
 
     if (Platform.isAndroid || Platform.isIOS) {
+
+
       
+    } else if (Platform.isWindows) {
+
+    }
+    
+  }
+
+  void _playTrackStream(String path) async {
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      int result = 1;//await advancedPlayer.play("http://172.17.68.97:8080/blackmillmiracle.mp3");//"http://192.168.0.121:8080/api/track/60711e1e84597a84e8904e58");
+      
+      try {
+          await assetsAudioPlayer.open(
+              Audio.network("http://192.168.0.103:8080/blackmillmiracle.mp3"),    
+          );
+
+          //assetsAudioPlayer.open(
+          //  Audio("assets/DROELOE - Taking Flight.flac"),
+          //);
+          
+          print('playing!');
+      } catch (t) {
+          print('could not play!');
+      }
+
     } else if (Platform.isWindows) {
 
     }
@@ -240,7 +270,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
           children: [
           new IconButton(icon: new Icon (Icons.shuffle) ,onPressed: () {},),
           new IconButton(iconSize: 40,icon: new Icon (Icons.skip_previous) ,onPressed: () {},),
-          new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () {audioCache.fixedPlayer?.stop();},),
+          new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () { /*audioCache.fixedPlayer?.stop();*/},),
           new IconButton(iconSize: 40,icon: new Icon (Icons.skip_next) ,onPressed: () {},),
           new IconButton(icon: new Icon (Icons.loop) ,onPressed: () {},),
           ])
@@ -320,9 +350,9 @@ class EntryItem extends StatelessWidget {
                             highlightColor: Colors.deepPurple,
                             onTap: () async {
                               print('tap2!');
-                              final bytes = await (await crt.audioCache.loadAsFile(l.file_path))
-                                .readAsBytes();
-                            crt.audioCache.playBytes(bytes);
+                              //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
+                              //crt.audioCache.playBytes(bytes);
+                              crt._playTrackStream(l.id);
                             },
                             child: 
                           Column(children: [

@@ -10,7 +10,8 @@ class Track {
   Track(String this.name, String this.id, String this.file_path, {
     String this.artist = "",String this.artists="", bool this.is_active = true, bool this.is_missing = false, bool this.is_downloaded = false,
     int this.play_count = 0, int this.track = 0, int this.track_of = 0, int this.disk = 0, int this.disk_of = 0,
-    String this.album = "", double this.duration = 0.0, int size = 0, String format = "",
+    String this.album = "", int this.duration = 0, int size = 0, String format = "",
+    String genre = "", int year = 0, String release_date = "", String added_date = "", String last_played_date = "" 
     
     });
   
@@ -32,7 +33,7 @@ class Track {
   int? disk;
   int? disk_of;
   String? format;
-  double? duration;
+  int? duration;
   int? size;
   String artist;
   String? artists;
@@ -42,13 +43,12 @@ class Track {
       'id': id,
       'name': name,
       'file_path': file_path,
-      //'release_date': release_date,
-      //'added_date': added_date,
-      //'last_played_date': last_played_date,
-      //'year: : year,
       'artist': artist,
-      //'genre: : genre,
-      /*
+      'release_date': release_date,
+      'added_date': added_date,
+      'last_played_date': last_played_date,
+      'year' : year,
+      'genre' : genre,
       'artists': artists,
       'is_active': is_active,
       'is_missing': is_missing,
@@ -62,9 +62,6 @@ class Track {
       'duration': duration,
       'size': size,
       'format': format,
-      
-      */
-      
     };
   }
 

@@ -86,7 +86,7 @@ class Api {
 
 
       Track track = new Track(d['name'], d['_id'], 
-       d['file_path'], artist: d['artist'], is_active: d['active']);
+       d['file_path'], artist: d['artist'], is_active: d['active'], play_count: d['play_count']);
       //
       
       tracks.add(track);
