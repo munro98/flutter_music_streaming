@@ -8,6 +8,8 @@ import 'package:http/http.dart';
 //import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart';
 
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
+
 import 'package:assets_audio_player/assets_audio_player.dart';
 
 //import 'player_widget.dart';
@@ -53,6 +55,12 @@ class _CategoryRouteState extends State<CategoryRoute> {
   Choice _selectedChoice = choices[0]; // The app's "state".
   String sortOrder = 'best';
 
+  int _pageSize = 128;
+  int currTracksLoaded = 0;
+
+  final PagingController<int, Track> _pagingController =
+      PagingController(firstPageKey: 0);
+
   @override
   void initState() {
     super.initState();
@@ -60,13 +68,42 @@ class _CategoryRouteState extends State<CategoryRoute> {
     _tracks.add(new Track("Taking Flight", "456", "DROELOE - Taking Flight.flac", artist:"DROELOE"));
     _tracks.add(new Track("Happy Endings", "456", "Mike Shinoda - Happy Endings (feat. iann dior and UPSAHL).flac", artist:"Mike Shinoda"));
     _tracks.add(new Track("The end", "456", "audio.mp3", artist:"the backenders"));
-    //_tracks.add(new Track("The end", "456","the backenders;asfas", DateTime.parse("2000-07-20 20:18:04Z"), artist:"the backenders"));
-    //_tracks.add(new Track("The end", "456","the backenders;asfas", DateTime.parse("2000-07-20 20:18:04Z"), artist:"the backenders"));
-    //_tracks.add(new Track("The end", "456","the backenders;asfas", DateTime.parse("2000-07-20 20:18:04Z"), artist:"the backenders"));
 
     AppDatabase.openConnection();
 
+    _pagingController.addPageRequestListener((pageKey) {
+      _fetchPage(pageKey);
+    });
+
     print(" initState" + _tracks.length.toString());
+  }
+
+  Future<void> _fetchPage(pageKey) async {
+    //try {
+      List<Track> newItems = [];
+      newItems.addAll(await AppDatabase.fetchTracksPage(_pageSize,pageKey));
+
+      final isLastPage = newItems.length < _pageSize;
+      if (isLastPage) {
+        _pagingController.appendLastPage(newItems);
+      } else {
+        final nextPageKey = pageKey + newItems.length;
+        _pagingController.appendPage(newItems, nextPageKey);
+      }
+
+      /*
+      final isLastPage = newItems.length < _pageSize;
+      if (isLastPage) {
+        _pagingController.appendLastPage(newItems);
+      } else {
+        final nextPageKey = pageKey + newItems.length;
+        _pagingController.appendPage(newItems, nextPageKey);
+      }
+      */
+      //_pagingController.appendPage(data, pageKey+data.length);
+    //} catch (error) {
+    //  _pagingController.error = error;
+    //}
   }
 
   
@@ -166,12 +203,17 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
     final tracks2 = await AppDatabase.fetchTracks();
 
+    _pagingController.refresh();
 
     setState(() {
       _tracks = tracks2;
+      _pagingController.refresh();
     });
 
   }
+
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +228,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
           Container(
               //height: MediaQuery.of(context).size.height,
               child:
-
               new ListView.builder(
 
                 //padding: new EdgeInsets.all(8.0),
@@ -196,7 +237,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
                   return new SubbRedditButton(playlists[index], this);
                 },
               )
-
 
           )
       ),
@@ -281,11 +321,26 @@ class _CategoryRouteState extends State<CategoryRoute> {
       ,
       
       body: 
+
+        PagedListView<int, Track>(
+          pagingController: _pagingController,
+          builderDelegate: PagedChildBuilderDelegate<Track>(
+            itemBuilder: (context, item, index) => 
+            EntryItem(
+              item, index,this
+              ),
+          ),
+        )
+        
+
+      /*
       new ListView.builder(
         itemBuilder:  (BuildContext context, int index) {
             return new EntryItem( _tracks[index] , index, this);}, // return sql query here? _tracks[index]  AppDatabase.fetchTrack(index)
-        itemCount: 20,//_tracks.length,
-      ),
+        itemCount: _tracks.length,//,
+      )
+      */
+      ,
     ));
   }
 }

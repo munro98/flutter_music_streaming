@@ -73,21 +73,60 @@ class AppDatabase {
 
     print("fetching tracks");
     // Get a reference to the database.
-    final Database db = await (database as Future<Database>);
 
-    // Query the table
-    final List<Map<String, dynamic>> maps = await db.query('track');
+    try {
+      final Database db = await (database as Future<Database>);
 
-    List<Track> tracks = List.generate(maps.length, (i) {
-      return Track(
-        maps[i]['name'],
-        maps[i]['id'],
-        maps[i]['file_path'],
-        artist: maps[i]['artist'],
-      );
-    });
+      // Query the table
+      final List<Map<String, dynamic>> maps = await db.query('track');
 
-    return tracks;
+      List<Track> tracks = List.generate(maps.length, (i) {
+        return Track(
+          maps[i]['name'],
+          maps[i]['id'],
+          maps[i]['file_path'],
+          artist: maps[i]['artist'],
+        );
+      });
+
+      return tracks;
+
+    } catch(e) {
+      return [];
+    }
+    
+  }
+
+  static Future<List<Track>> fetchTracksPage (int _limit, int offset) async {
+    try {
+      print("fetching tracks");
+      // Get a reference to the database.
+      final Database db = await (database as Future<Database>);
+
+
+      // Query the table
+      //final List<Map<String, dynamic>> maps = await db.query('track', where: 'rowid > ?', whereArgs: [id],
+      //orderBy: 'rowid', limit: _limit);
+      //final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE rowid NOT IN ( SELECT rowid FROM track ORDER BY rowid ASC LIMIT 50 ) ORDER BY rowid ASC LIMIT 10');
+
+      // https://gist.github.com/ssokolow/262503
+      final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' + offset.toString() + ' )ORDER BY oid ASC LIMIT ' + _limit.toString());
+
+      List<Track> tracks = List.generate(maps.length, (i) {
+        return Track(
+          maps[i]['name'],
+          maps[i]['id'],
+          maps[i]['file_path'],
+          artist: maps[i]['artist'],
+        );
+      });
+
+      print("fetching tracks " + tracks.length.toString());
+
+      return tracks;
+    } catch (e) {
+      return [];
+    }
   }
 
   static Future<Track> fetchTrack (int id) async {
