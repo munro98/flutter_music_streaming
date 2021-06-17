@@ -90,6 +90,26 @@ class AppDatabase {
     return tracks;
   }
 
+  static Future<Track> fetchTrack (int id) async {
+
+    print("fetching track");
+    // Get a reference to the database.
+    final Database db = await (database as Future<Database>);
+
+    // Query the table
+    final List<Map<String, dynamic>> maps = await db.query('track', where: 'rowid = ?', whereArgs: [id]);
+
+    return Track(
+      maps[0]['name'],
+      maps[0]['id'],
+      maps[0]['file_path'],
+      artist: maps[0]['artist'],
+    );
+
+
+
+  }
+
   /*
 
 

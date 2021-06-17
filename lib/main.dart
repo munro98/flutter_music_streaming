@@ -18,11 +18,6 @@ import 'AppDatabase.dart';
 
 List<String> playlists = <String>["ONE","two", "three"];
 
-
-const kUrl1 = 'https://luan.xyz/files/audio/ambient_c_motion.mp3';
-
-
-
 class Choice {
   const Choice({this.title, this.icon});
 
@@ -53,6 +48,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
   String? localFilePath;
 
   List<Track> _tracks = <Track>[];
+  Map<int, Track> _tMap = Map<int, Track>();
   String currentSub = 'all';
   Choice _selectedChoice = choices[0]; // The app's "state".
   String sortOrder = 'best';
@@ -75,7 +71,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   
   Future _loadFile() async {
-    final bytes = await readBytes(Uri.parse(kUrl1));
+    final bytes = await readBytes(Uri.parse("kUrl1"));
     final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/DROELOE - Taking Flight.flac');
 
@@ -114,8 +110,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
       int result = 1;//await advancedPlayer.play("http://172.17.68.97:8080/blackmillmiracle.mp3");//"http://192.168.0.121:8080/api/track/60711e1e84597a84e8904e58");
       
       try {
+          assetsAudioPlayer.stop();
           await assetsAudioPlayer.open(
-              Audio.network("http://192.168.0.103:8080/blackmillmiracle.mp3"),    
+              Audio.network("http://192.168.0.121:8080/api/track/"+path)//Audio.network("http://192.168.0.103:8080/blackmillmiracle.mp3"),   
           );
 
           //assetsAudioPlayer.open(
@@ -134,15 +131,15 @@ class _CategoryRouteState extends State<CategoryRoute> {
   }
 
   void _play_pause() {
-    if (Platform.isAndroid || Platform.isIOS) {
-      
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      assetsAudioPlayer.playOrPause();
     } else if (Platform.isWindows) {
       
     }
   }
 
   void _skip_next() {
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       
     } else if (Platform.isWindows) {
       
@@ -150,7 +147,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
   }
 
   void _skip_prev() {
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       
     } else if (Platform.isWindows) {
       
@@ -261,7 +258,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
         children: [
                     MyStatefulWidget(),
       Padding(
-        padding: const EdgeInsets.fromLTRB(6.0, 0.0, 6.0, 12.0),
+        padding: const EdgeInsets.fromLTRB(6.0, 0.0, 6.0, 6.0),
         child:
 
         Row(
@@ -270,7 +267,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
           children: [
           new IconButton(icon: new Icon (Icons.shuffle) ,onPressed: () {},),
           new IconButton(iconSize: 40,icon: new Icon (Icons.skip_previous) ,onPressed: () {},),
-          new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () { /*audioCache.fixedPlayer?.stop();*/},),
+          new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () { assetsAudioPlayer.playOrPause();},),
           new IconButton(iconSize: 40,icon: new Icon (Icons.skip_next) ,onPressed: () {},),
           new IconButton(icon: new Icon (Icons.loop) ,onPressed: () {},),
           ])
@@ -285,9 +282,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
       
       body: 
       new ListView.builder(
-        itemBuilder: (BuildContext context, int index) =>
-            new EntryItem(_tracks[index], index, this),
-        itemCount: _tracks.length,
+        itemBuilder:  (BuildContext context, int index) {
+            return new EntryItem( _tracks[index] , index, this);}, // return sql query here? _tracks[index]  AppDatabase.fetchTrack(index)
+        itemCount: 20,//_tracks.length,
       ),
     ));
   }
@@ -361,7 +358,6 @@ class EntryItem extends StatelessWidget {
                         )]
                         )
                         )//,
-                        //Text(' ago by aaaaaaaaaaaaa') //Text('<hrs> ago by (<user>)')
                       ]),
                   decoration: new BoxDecoration(
                     color: index % 2 == 1 ?  Colors.grey[200]: Colors.grey[50],
@@ -573,7 +569,7 @@ class _MyStatefulWidgetState extends State<MyStatefulWidget>
   @override
   Widget build(BuildContext context) {
     return Padding(
-        padding: const EdgeInsets.all(10.0),
+        padding: const EdgeInsets.fromLTRB(10.0, 10.0, 10.0, 4.0),
         child: Column(
           //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           mainAxisSize: MainAxisSize.min,
