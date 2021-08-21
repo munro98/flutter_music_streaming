@@ -3,10 +3,7 @@ import 'dart:async';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
-//import 'package:flutter/widgets.dart'
-
 import 'Track.dart';
-
 class AppDatabase {
 
   static Future<Database>? database;
@@ -32,7 +29,7 @@ class AppDatabase {
   }
   */
 
-  static void openConnection() async {
+  static Future<void> openConnection() async {
 
     database = openDatabase(
       // Set the path to the database. Note: Using the `join` function from the
@@ -52,6 +49,8 @@ class AppDatabase {
       version: 1,
     );
 
+    // "CREATE TABLE playlist(id BINARY(12) PRIMARY KEY, name TEXT, description TEXT, created_at TEXT, store_locally BOOL)"
+    // // "CREATE TABLE playlist_item(id BINARY(12) PRIMARY KEY, track_id BINARY(12), is_active BOOL, added_at TEXT)"
   }
 
   static Future<void> insertTrack(Track track) async {
@@ -110,7 +109,7 @@ class AppDatabase {
       //final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE rowid NOT IN ( SELECT rowid FROM track ORDER BY rowid ASC LIMIT 50 ) ORDER BY rowid ASC LIMIT 10');
 
       // https://gist.github.com/ssokolow/262503
-      final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' + offset.toString() + ' )ORDER BY oid ASC LIMIT ' + _limit.toString());
+      final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' + offset.toString() + ' )ORDER BY oid ASC LIMIT ' + _limit.toString());
 
       List<Track> tracks = List.generate(maps.length, (i) {
         return Track(
@@ -118,13 +117,21 @@ class AppDatabase {
           maps[i]['id'],
           maps[i]['file_path'],
           artist: maps[i]['artist'],
+          oid: maps[i]['oid'].toString(),
         );
       });
 
       print("fetching tracks " + tracks.length.toString());
 
+      for (int i = 0; i < tracks.length; i++) { // TODO: HOW DOES THIS EVEN WORK!!!!????
+        tracks[i].oid = maps[i]['oid'].toString();
+      }
+      print("fetching trackssdfgasdgd " + maps[0]['oid'].toString());
+      print("fetching trackssdfgasdgd " + tracks[0].oid.toString());
+
       return tracks;
     } catch (e) {
+      print("fetching tracks error " + e.toString());
       return [];
     }
   }
@@ -144,13 +151,103 @@ class AppDatabase {
       maps[0]['file_path'],
       artist: maps[0]['artist'],
     );
+  }
 
+  static Future<Track> fetchNextTrack (String id, String sortOrder) async {
+    print("fetching track");
+    // Get a reference to the database.
+    final Database db = await (database as Future<Database>);
 
+    final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT rowid as oid, * FROM track WHERE oid > '+ id + ' ORDER BY oid ASC LIMIT ' + '1');
 
+     Track t =Track(
+      maps[0]['name'],
+      maps[0]['id'],
+      maps[0]['file_path'],
+      artist: maps[0]['artist'],
+      oid: maps[0]['oid'].toString(),
+    );
+    t.oid = maps[0]['oid'].toString();
+
+    return t;
+  }
+
+  static Future<Track> fetchPrevTrack (String id, String sortOrder) async {
+    print("fetching track");
+    // Get a reference to the database.
+    final Database db = await (database as Future<Database>);
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT rowid as oid, * FROM track WHERE oid < '+ id + ' ORDER BY oid DESC LIMIT ' + '1');
+
+     Track t =Track(
+      maps[0]['name'],
+      maps[0]['id'],
+      maps[0]['file_path'],
+      artist: maps[0]['artist'],
+      oid: maps[0]['oid'].toString(),
+    );
+    t.oid = maps[0]['oid'].toString();
+
+    return t;
+  }
+
+  static Future<List<Track>> fetchPlaylistTracks (List<String> trackids) async {
+
+    print("appdb: fetching tracks");
+    // Get a reference to the database.
+
+    try {
+      final Database db = await (database as Future<Database>);
+
+      List<Track> tracks = [];
+
+      for (var id in trackids) {
+        final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE id = \''+ id + '\'');
+        tracks.add(
+          Track(
+          maps[0]['name'],
+          maps[0]['id'],
+          maps[0]['file_path'],
+          artist: maps[0]['artist'],
+        )
+        );
+      }
+
+      return tracks;
+
+    } catch(e) {
+      return [];
+    }
+    
   }
 
   /*
+  static Future<List<Track>> fetchPlaylistTracksPage (String id ,int _limit, int offset) async {
+    try {
+      print("fetching tracks");
+      // Get a reference to the database.
+      //final Database db = await (database as Future<Database>);
 
+      //final List<Map<String, dynamic>> maps = await db.rawQuery(
+      //  'SELECT track.name, track,id, track.file_path FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' + offset.toString() + ' )ORDER BY oid ASC LIMIT ' + _limit.toString());
+      //'SELECT track.name, track,id, track.file_path FROM track INNER JOIN  WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' + offset.toString() + ' )ORDER BY oid ASC LIMIT ' + _limit.toString()
+
+      List<Track> tracks = List.generate(maps.length, (i) {
+        return Track(
+          maps[i]['name'],
+          maps[i]['id'],
+          maps[i]['file_path'],
+          artist: maps[i]['artist'],
+        );
+      });
+
+      print("fetching tracks " + tracks.length.toString());
+
+      return tracks;
+    } catch (e) {
+      return [];
+    }
+  }
 
   Future<void> updateDog(Dog dog) async {
     // Get a reference to the database.
@@ -180,8 +277,6 @@ class AppDatabase {
       whereArgs: [id],
     );
   }
-
-
   */
 
 

@@ -3,34 +3,53 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:provider/provider.dart';
+//import 'package:provider/provider.dart';
 import 'package:http/http.dart';
-//import 'package:audioplayers/audioplayers.dart';
-import 'package:http/http.dart';
+
+
 
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
-
-import 'package:assets_audio_player/assets_audio_player.dart';
-
-//import 'player_widget.dart';
+import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
 
 import 'Track.dart';
 import 'AppDatabase.dart';
+import 'API.dart';
+import 'Playlist.dart';
 
+/*
+todo
 
-List<String> playlists = <String>["ONE","two", "three"];
+download played songs
+shuffle playing
+
+store playlist data in local json files
+download playlists
+
+add settings menu
+
+sort order
+date_added
+artist name
+song name
+duration
+*/
+
+enum ViewState {
+  all,
+  playlist
+}
 
 class Choice {
-  const Choice({this.title, this.icon});
+  const Choice(String this.title, IconData this.icon);
 
-  final String? title;
-  final IconData? icon;
+  final String title;
+  final IconData icon;
 }
 
 const List<Choice> choices = const <Choice>[
-  const Choice(title: 'Button1', icon: Icons.directions_car),
-  const Choice(title: 'Button2', icon: Icons.directions_boat),
-  const Choice(title: 'Button3', icon: Icons.directions_bus),
+  const Choice('Button1', Icons.directions_car),
+  const Choice('Button2', Icons.directions_boat),
+  const Choice('Button3', Icons.directions_bus),
 ];
 
 class CategoryRoute extends StatefulWidget {
@@ -42,21 +61,23 @@ class CategoryRoute extends StatefulWidget {
 
 class _CategoryRouteState extends State<CategoryRoute> {
 
-  
-  //AudioPlayer advancedPlayer = AudioPlayer();
-  //AudioCache audioCache = AudioCache(fixedPlayer: AudioPlayer());
   AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
 
   String? localFilePath;
 
   List<Track> _tracks = <Track>[];
   Map<int, Track> _tMap = Map<int, Track>();
-  String currentSub = 'all';
-  Choice _selectedChoice = choices[0]; // The app's "state".
+  Playlist currentSub = new Playlist("o", "123");
+  Choice _selectedChoice = choices[0];
   String sortOrder = 'best';
 
-  int _pageSize = 128;
-  int currTracksLoaded = 0;
+  ViewState _vs = ViewState.all;
+
+  List<Playlist> _playlists = [];
+
+  Track? current;
+
+  final int _pageSize = 128;
 
   final PagingController<int, Track> _pagingController =
       PagingController(firstPageKey: 0);
@@ -69,10 +90,18 @@ class _CategoryRouteState extends State<CategoryRoute> {
     _tracks.add(new Track("Happy Endings", "456", "Mike Shinoda - Happy Endings (feat. iann dior and UPSAHL).flac", artist:"Mike Shinoda"));
     _tracks.add(new Track("The end", "456", "audio.mp3", artist:"the backenders"));
 
-    AppDatabase.openConnection();
+    AppDatabase.openConnection().then((value) => this.refresh());
 
     _pagingController.addPageRequestListener((pageKey) {
       _fetchPage(pageKey);
+    });
+
+    assetsAudioPlayer.playlistAudioFinished.listen((Playing playing){
+      print(" music finished");
+
+      //_skip_next();
+      
+
     });
 
     print(" initState" + _tracks.length.toString());
@@ -80,33 +109,33 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   Future<void> _fetchPage(pageKey) async {
     //try {
-      List<Track> newItems = [];
-      newItems.addAll(await AppDatabase.fetchTracksPage(_pageSize,pageKey));
 
-      final isLastPage = newItems.length < _pageSize;
-      if (isLastPage) {
-        _pagingController.appendLastPage(newItems);
-      } else {
-        final nextPageKey = pageKey + newItems.length;
-        _pagingController.appendPage(newItems, nextPageKey);
-      }
+      if (_vs == ViewState.all) {
 
-      /*
-      final isLastPage = newItems.length < _pageSize;
-      if (isLastPage) {
-        _pagingController.appendLastPage(newItems);
-      } else {
-        final nextPageKey = pageKey + newItems.length;
-        _pagingController.appendPage(newItems, nextPageKey);
+        List<Track> newItems = [];
+        newItems.addAll(await AppDatabase.fetchTracksPage(_pageSize,pageKey));
+
+        final isLastPage = newItems.length < _pageSize;
+        if (isLastPage) {
+          _pagingController.appendLastPage(newItems);
+        } else {
+          final nextPageKey = pageKey + newItems.length;
+          _pagingController.appendPage(newItems, nextPageKey);
+        }
+
+      } else if (_vs == ViewState.playlist) {
+
+        _pagingController.appendLastPage(_tracks);
+        
       }
-      */
+      
+
       //_pagingController.appendPage(data, pageKey+data.length);
     //} catch (error) {
     //  _pagingController.error = error;
     //}
   }
 
-  
   Future _loadFile() async {
     final bytes = await readBytes(Uri.parse("kUrl1"));
     final dir = await getApplicationDocumentsDirectory();
@@ -117,7 +146,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
       setState(() => localFilePath = file.path);
     }
   }
-  
 
   void _select(Choice choice) {
     setState(() {
@@ -141,15 +169,16 @@ class _CategoryRouteState extends State<CategoryRoute> {
     
   }
 
-  void _playTrackStream(String path) async {
+  void _playTrackStream(Track track) async {
+
+    current = track;
 
     if (Platform.isAndroid || Platform.isIOS) {
-      int result = 1;//await advancedPlayer.play("http://172.17.68.97:8080/blackmillmiracle.mp3");//"http://192.168.0.121:8080/api/track/60711e1e84597a84e8904e58");
       
       try {
           assetsAudioPlayer.stop();
           await assetsAudioPlayer.open(
-              Audio.network("http://192.168.0.121:8080/api/track/"+path)//Audio.network("http://192.168.0.103:8080/blackmillmiracle.mp3"),   
+              Audio.network("http://192.168.0.103:3000/api/track/"+track.id)
           );
 
           //assetsAudioPlayer.open(
@@ -175,22 +204,62 @@ class _CategoryRouteState extends State<CategoryRoute> {
     }
   }
 
-  void _skip_next() {
+  Future<Track> getNextTrack() async {
+    if (current != null) {
+      Track c = current as Track;
+      print(" ________________________________________________________________________________________________________________________oid " + c.oid.toString());
+
+      Track next = await AppDatabase.fetchNextTrack(c.oid as String , "");
+      print("________________________________________" + next.name);
+      return next;
+    }
+    throw Exception();
+  }
+
+  Future<Track> getPrevTrack() async {
+    if (current != null) {
+      Track c = current as Track;
+      Track next = await AppDatabase.fetchPrevTrack(c.oid as String , "");
+      return next;
+    }
+    throw Exception();
+  }
+
+  void _skip_next() async {
     if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-      
+
+      assetsAudioPlayer.stop();
+      try {
+        Track t = await getNextTrack();
+        current = t;
+        await assetsAudioPlayer.open(
+            Audio.network("http://192.168.0.103:8080/api/track/"+t.id)
+        );
+      } catch (e) {
+
+      }
+
     } else if (Platform.isWindows) {
       
     }
   }
 
-  void _skip_prev() {
+  void _skip_prev() async {
     if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-      
+      assetsAudioPlayer.stop();
+      try {
+        Track t = await getPrevTrack();
+        current = t;
+        await assetsAudioPlayer.open(
+            Audio.network("http://192.168.0.103:8080/api/track/"+t.id)
+        );
+      } catch (e) {
+
+      }
     } else if (Platform.isWindows) {
       
     }
   }
-
 
   void refresh() async {
 
@@ -199,7 +268,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
     for (int i = 0; i < tracks.length; i++) {
       AppDatabase.insertTrack(tracks[i]);
     }
-    
 
     final tracks2 = await AppDatabase.fetchTracks();
 
@@ -212,8 +280,31 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   }
 
+  void refreshPlaylists() async {
 
-  
+    List<Playlist> playlists = await Api.fetchPlaylists("track", sortOrder);
+
+    setState(() {
+      _vs = ViewState.playlist;
+      _playlists = playlists;
+      _pagingController.refresh();
+    });
+
+  }
+
+  void loadPlaylist(Playlist playlist) async {
+
+    final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
+    final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
+
+    //_pagingController.appendLastPage(tracks2);
+
+    setState(() {
+      _tracks = tracks2;
+      _pagingController.refresh();
+    });
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,9 +323,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
                 //padding: new EdgeInsets.all(8.0),
                 itemExtent: 40.0,
-                itemCount: playlists.length,
+                itemCount: _playlists.length,
                 itemBuilder: (BuildContext context, int index) {
-                  return new SubbRedditButton(playlists[index], this);
+                  return new SubbRedditButton(_playlists[index], this);
                 },
               )
 
@@ -283,7 +374,10 @@ class _CategoryRouteState extends State<CategoryRoute> {
             return choices.map((Choice choice) {
               return new PopupMenuItem<Choice>(
                 value: choice,
-                child: new Text("choice.title"),
+                child: new Text(choice.title),
+                onTap: () async {
+                  refreshPlaylists();
+                },
               );
             }).toList();
           },
@@ -306,9 +400,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
           new IconButton(icon: new Icon (Icons.shuffle) ,onPressed: () {},),
-          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_previous) ,onPressed: () {},),
+          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_previous) ,onPressed: () {_skip_prev();},),
           new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () { assetsAudioPlayer.playOrPause();},),
-          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_next) ,onPressed: () {},),
+          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_next) ,onPressed: () {_skip_next();},),
           new IconButton(icon: new Icon (Icons.loop) ,onPressed: () {},),
           ])
       )
@@ -404,11 +498,11 @@ class EntryItem extends StatelessWidget {
                               print('tap2!');
                               //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
                               //crt.audioCache.playBytes(bytes);
-                              crt._playTrackStream(l.id);
+                              crt._playTrackStream(l);
                             },
                             child: 
                           Column(children: [
-                            Text(l.artist + " - " + l.name, style: new TextStyle(fontSize: 13),)
+                            Text(l.artist + " - " + l.name+l.oid.toString(), style: new TextStyle(fontSize: 13),)
                           ])),
                         )]
                         )
@@ -427,13 +521,11 @@ class EntryItem extends StatelessWidget {
     return _buildTiles(l, context);
   }
 }
-
-
 class SubbRedditButton extends StatelessWidget {
 
   const SubbRedditButton(this.sub, this.crState);
 
-  final String sub;
+  final Playlist sub;
   final _CategoryRouteState crState;
 
   @override
@@ -446,6 +538,7 @@ class SubbRedditButton extends StatelessWidget {
               crState.currentSub = sub;
             }
             );
+            crState.loadPlaylist(sub);
             crState.refresh();
             print(crState.currentSub);
 
@@ -455,7 +548,7 @@ class SubbRedditButton extends StatelessWidget {
         //margin: EdgeInsets.,
       child:
         Text(
-            sub,
+            sub.name,
             style: new TextStyle(fontSize: 32.0)
         )
       )
@@ -493,100 +586,6 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
-    );
-  }
-}
-
-
-
-
-/////////////////////
-
-
-
-
 
 
 /// This is the stateful widget that the main application instantiates.

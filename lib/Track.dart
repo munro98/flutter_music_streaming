@@ -11,13 +11,15 @@ class Track {
     String this.artist = "",String this.artists="", bool this.is_active = true, bool this.is_missing = false, bool this.is_downloaded = false,
     int this.play_count = 0, int this.track = 0, int this.track_of = 0, int this.disk = 0, int this.disk_of = 0,
     String this.album = "", int this.duration = 0, int size = 0, String format = "",
-    String genre = "", int year = 0, String release_date = "", String added_date = "", String last_played_date = "" 
+    String genre = "", int year = 0, String release_date = "", String added_date = "", String last_played_date = ""
+    , String oid = "" 
     
     });
   
   String name;
   String file_path;
-  String id;
+  String id; // mongoID
+  String? oid; // sqliteID
   bool is_active;
   bool is_downloaded;
   bool? is_missing;
@@ -69,9 +71,9 @@ class Track {
 
 
 
-class Api {
+class Apiabc {
 
-  static final String url = '192.168.0.121:8080';
+  static final String url = '192.168.0.103:3000';
 
   static Future<List<Track>> fetchTracks (String permalink, String sortOrder) async {
 
