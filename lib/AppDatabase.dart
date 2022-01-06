@@ -98,7 +98,7 @@ class AppDatabase {
 
   static Future<List<Track>> fetchTracksPage (int _limit, int offset) async {
     try {
-      print("fetching tracks");
+      print("APPDB: fetching tracks");
       // Get a reference to the database.
       final Database db = await (database as Future<Database>);
 
@@ -138,7 +138,7 @@ class AppDatabase {
 
   static Future<Track> fetchTrack (int id) async {
 
-    print("fetching track");
+    print("APPDB: fetchtrack");
     // Get a reference to the database.
     final Database db = await (database as Future<Database>);
 
@@ -173,7 +173,7 @@ class AppDatabase {
   }
 
   static Future<Track> fetchPrevTrack (String id, String sortOrder) async {
-    print("fetching track");
+    print("APPDB: fetchPrevTrack");
     // Get a reference to the database.
     final Database db = await (database as Future<Database>);
 
@@ -193,7 +193,7 @@ class AppDatabase {
 
   static Future<List<Track>> fetchPlaylistTracks (List<String> trackids) async {
 
-    print("appdb: fetching tracks");
+    print("APPDB: fetching tracks");
     // Get a reference to the database.
 
     try {

@@ -15,6 +15,7 @@ import 'Track.dart';
 import 'AppDatabase.dart';
 import 'API.dart';
 import 'Playlist.dart';
+import 'Player.dart';
 
 /*
 todo
@@ -38,6 +39,7 @@ enum ViewState {
   all,
   playlist
 }
+
 
 class Choice {
   const Choice(String this.title, IconData this.icon);
@@ -75,12 +77,16 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   List<Playlist> _playlists = [];
 
+  Player _player = Player();
+
   Track? current;
 
   final int _pageSize = 128;
 
   final PagingController<int, Track> _pagingController =
       PagingController(firstPageKey: 0);
+
+  //bool _isPlaylist = false;
 
   @override
   void initState() {
@@ -100,11 +106,30 @@ class _CategoryRouteState extends State<CategoryRoute> {
       print(" music finished");
 
       //_skip_next();
-      
-
     });
 
+    fetchPlaylists2();
+
     print(" initState" + _tracks.length.toString());
+  }
+
+  fetchPlaylists2() async {
+
+    try {
+      List<Playlist> playlists = await Api.fetchPlaylists("", "");
+
+      playlists.add(new Playlist("All Music", "#ALL#"));
+
+      setState(() {
+      _playlists = playlists;
+      _vs = ViewState.playlist;
+      });
+
+    } catch (e) {
+      print("fetchPlaylists2 error: " + e.toString());
+    }
+
+    //print(" fetchPlaylists" + _playlists.length.toString());
   }
 
   Future<void> _fetchPage(pageKey) async {
@@ -178,7 +203,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
       try {
           assetsAudioPlayer.stop();
           await assetsAudioPlayer.open(
-              Audio.network("http://192.168.0.103:3000/api/track/"+track.id)
+              Audio.network("http://192.168.0.105:3000/api/track/"+track.id)
           );
 
           //assetsAudioPlayer.open(
@@ -251,7 +276,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
         Track t = await getPrevTrack();
         current = t;
         await assetsAudioPlayer.open(
-            Audio.network("http://192.168.0.103:8080/api/track/"+t.id)
+            Audio.network("http://192.168.0.105:8080/api/track/"+t.id)
         );
       } catch (e) {
 
@@ -294,16 +319,32 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   void loadPlaylist(Playlist playlist) async {
 
+    if (playlist.id == "#ALL#") {
+      
+      final tracks2 = await AppDatabase.fetchTracks();
+      
+      setState(() {
+      _vs = ViewState.all;
+      _tracks = tracks2;
+      _pagingController.refresh();
+    });
+      
+    } else {
+      final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
+      final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);//fetchTracksByPlaylist
+
+      setState(() {
+      _vs = ViewState.playlist;
+      _tracks = tracks2;
+      _pagingController.refresh();
+    });
+      
+    }
+
     final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
     final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
 
     //_pagingController.appendLastPage(tracks2);
-
-    setState(() {
-      _tracks = tracks2;
-      _pagingController.refresh();
-    });
-
   }
 
   @override
@@ -415,7 +456,15 @@ class _CategoryRouteState extends State<CategoryRoute> {
       ,
       
       body: 
-
+      
+      _vs == ViewState.playlist ?
+      ListView.builder(
+        itemCount: _tracks.length,
+        itemBuilder: (BuildContext context, int index) {
+          return new EntryItem(_tracks[index], index, this);
+        },
+      )
+      :
         PagedListView<int, Track>(
           pagingController: _pagingController,
           builderDelegate: PagedChildBuilderDelegate<Track>(

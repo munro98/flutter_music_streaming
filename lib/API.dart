@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 
 class Api {
 
-  static final String url = '192.168.0.103:3000';
+  static final String url = '192.168.0.105:3000';
 
   /*
   static Future<List<Playlist>> fetchPlaylists () async {
@@ -66,15 +66,6 @@ class Api {
     print(jsonResponse);
 
     for (var d in jsonResponse['tracks']) {
-      //var lData = d['data'];
-      //print();
-
-      /*
-      Track track = new Track(d['name'], d['_id'], 
-       d['file_path'], artist: d['artist'], is_active: d['active'], play_count: d['play_count']);
-      //
-      
-      */
       tracks.add(d['id']);
     };
 
@@ -133,10 +124,10 @@ class Api {
     final httpRequest =
       await http.get(Uri.http(url, 'api/playlist'));
 
-    List<Playlist> tracks = <Playlist>[];
+    List<Playlist> playlist = <Playlist>[];
 
     if (httpRequest.statusCode != HttpStatus.OK) {
-      return tracks;
+      return playlist;
     }
 
     //final responseBody = await httpResponse.transform(utf8.decoder).join();
@@ -145,12 +136,12 @@ class Api {
     for (var d in jsonResponse['data']['playlist']) {
 
       Playlist track = new Playlist(d['name'], d['_id']);
-      tracks.add(track);
+      playlist.add(track);
 
 
     };
 
-    return tracks;
+    return playlist;
 
   }
   
