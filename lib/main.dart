@@ -5,11 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 //import 'package:provider/provider.dart';
 import 'package:http/http.dart';
-
+import 'package:device_info_plus/device_info_plus.dart';
 
 
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:android_path_provider/android_path_provider.dart';
+import 'dart:isolate';
+import 'dart:ui';
 
 import 'Track.dart';
 import 'AppDatabase.dart';
@@ -28,7 +33,7 @@ download playlists
 
 add settings menu
 
-sort order
+sort order by
 date_added
 artist name
 song name
@@ -61,10 +66,11 @@ class CategoryRoute extends StatefulWidget {
   _CategoryRouteState createState() => _CategoryRouteState();
 }
 
+ReceivePort _port = ReceivePort();
+
 class _CategoryRouteState extends State<CategoryRoute> {
 
-  AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
-
+  
   String? localFilePath;
 
   List<Track> _tracks = <Track>[];
@@ -88,30 +94,139 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   //bool _isPlaylist = false;
 
+  late String _localPath;
+  late bool _permissionReady;
+  List<_TaskInfo>? _tasks;
+  late List<_ItemHolder> _items;
+  late bool _isLoading;
+
+  final _images = [
+    {
+      'name': 'Arches National Park',
+      'link':
+          'https://upload.wikimedia.org/wikipedia/commons/7/78/Canyonlands_National_Park%E2%80%A6Needles_area_%286294480744%29.jpg'
+    }
+  ];
+
   @override
   void initState() {
     super.initState();
+    
+    IsolateNameServer.registerPortWithName(_port.sendPort, 'downloader_send_port');
+    _port.listen((dynamic data) {
+      String id = data[0];
+      DownloadTaskStatus status = data[1];
+      int progress = data[2];
+      setState((){ });
+    });
+    
+
+    FlutterDownloader.registerCallback(downloadCallback);
+
+
     //DateTime.parse("2000-07-20 20:18:04Z")
     _tracks.add(new Track("Taking Flight", "456", "DROELOE - Taking Flight.flac", artist:"DROELOE"));
     _tracks.add(new Track("Happy Endings", "456", "Mike Shinoda - Happy Endings (feat. iann dior and UPSAHL).flac", artist:"Mike Shinoda"));
     _tracks.add(new Track("The end", "456", "audio.mp3", artist:"the backenders"));
 
-    AppDatabase.openConnection().then((value) => this.refresh());
+    //AppDatabase.openConnection().then((value) => this.refresh());
+
+    AppDatabase.openConnection().then((value) => loadPlaylist(new Playlist("All", "#ALL#")));
+
 
     _pagingController.addPageRequestListener((pageKey) {
       _fetchPage(pageKey);
     });
 
-    assetsAudioPlayer.playlistAudioFinished.listen((Playing playing){
-      print(" music finished");
-
-      //_skip_next();
-    });
+    _permissionReady = false;
+    _isLoading = true;
+    _prepare();
+    
 
     fetchPlaylists2();
 
     print(" initState" + _tracks.length.toString());
   }
+
+  static void downloadCallback(String id, DownloadTaskStatus status, int progress) {
+    final SendPort send = IsolateNameServer.lookupPortByName('downloader_send_port')!;
+    send.send([id, status, progress]);
+  }
+
+  /////////////////////
+  ///
+  ///
+  ///
+  ///
+  ///
+
+  void _requestDownload(_TaskInfo task) async {
+    task.taskId = await FlutterDownloader.enqueue(
+      url: task.link!,
+      headers: {"auth": "test_for_sql_encoding"},
+      savedDir: _localPath,
+      showNotification: true,
+      openFileFromNotification: true,
+      saveInPublicStorage: false,
+    );
+  }
+
+  Future<Null> _prepare() async {
+    _permissionReady = await _checkPermission();
+    if (_permissionReady) {
+      await _prepareSaveDir();
+      _requestDownload(_TaskInfo(name: "Cool", link: "http://192.168.0.105:3000/api/track/60fa29525e7aac00381c88ef"));
+    }
+    setState(() {
+      _isLoading = false;
+    });
+  }
+  
+  Future<bool> _checkPermission() async {
+    if (Platform.isIOS) return true;
+
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+    if (Platform.isAndroid) {
+      final status = await Permission.storage.status;
+      if (status != PermissionStatus.granted) {
+        final result = await Permission.storage.request();
+        if (result == PermissionStatus.granted) {
+          return true;
+        }
+      } else {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _prepareSaveDir() async {
+    _localPath = (await _findLocalPath())!;
+    final savedDir = Directory(_localPath);
+    bool hasExisted = await savedDir.exists();
+    if (!hasExisted) {
+      savedDir.create();
+    }
+  }
+
+  Future<String?> _findLocalPath() async {
+    var externalStorageDirPath;
+    if (Platform.isAndroid) {
+      try {
+        externalStorageDirPath = await AndroidPathProvider.musicPath+"/Whale Music";
+      } catch (e) {
+        final directory = await getExternalStorageDirectory();
+        externalStorageDirPath = directory?.path;
+      }
+    } else if (Platform.isIOS) {
+      externalStorageDirPath =
+          (await getApplicationDocumentsDirectory()).absolute.path;
+    }
+    return externalStorageDirPath;
+  }
+
+  
 
   fetchPlaylists2() async {
 
@@ -194,41 +309,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
     
   }
 
-  void _playTrackStream(Track track) async {
-
-    current = track;
-
-    if (Platform.isAndroid || Platform.isIOS) {
-      
-      try {
-          assetsAudioPlayer.stop();
-          await assetsAudioPlayer.open(
-              Audio.network("http://192.168.0.105:3000/api/track/"+track.id)
-          );
-
-          //assetsAudioPlayer.open(
-          //  Audio("assets/DROELOE - Taking Flight.flac"),
-          //);
-          
-          print('playing!');
-      } catch (t) {
-          print('could not play!');
-      }
-
-    } else if (Platform.isWindows) {
-
-    }
-    
-  }
-
-  void _play_pause() {
-    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-      assetsAudioPlayer.playOrPause();
-    } else if (Platform.isWindows) {
-      
-    }
-  }
-
+  
+/*
   Future<Track> getNextTrack() async {
     if (current != null) {
       Track c = current as Track;
@@ -249,42 +331,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
     }
     throw Exception();
   }
-
-  void _skip_next() async {
-    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-
-      assetsAudioPlayer.stop();
-      try {
-        Track t = await getNextTrack();
-        current = t;
-        await assetsAudioPlayer.open(
-            Audio.network("http://192.168.0.103:8080/api/track/"+t.id)
-        );
-      } catch (e) {
-
-      }
-
-    } else if (Platform.isWindows) {
-      
-    }
-  }
-
-  void _skip_prev() async {
-    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-      assetsAudioPlayer.stop();
-      try {
-        Track t = await getPrevTrack();
-        current = t;
-        await assetsAudioPlayer.open(
-            Audio.network("http://192.168.0.105:8080/api/track/"+t.id)
-        );
-      } catch (e) {
-
-      }
-    } else if (Platform.isWindows) {
-      
-    }
-  }
+*/
+  
 
   void refresh() async {
 
@@ -366,7 +414,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
                 itemExtent: 40.0,
                 itemCount: _playlists.length,
                 itemBuilder: (BuildContext context, int index) {
-                  return new SubbRedditButton(_playlists[index], this);
+                  return new PlaylistButton(_playlists[index], this);
                 },
               )
 
@@ -431,7 +479,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-                    MyStatefulWidget(),
+                    MyStatefulWidget(this),
       Padding(
         padding: const EdgeInsets.fromLTRB(6.0, 0.0, 6.0, 6.0),
         child:
@@ -441,9 +489,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
           new IconButton(icon: new Icon (Icons.shuffle) ,onPressed: () {},),
-          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_previous) ,onPressed: () {_skip_prev();},),
-          new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () { assetsAudioPlayer.playOrPause();},),
-          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_next) ,onPressed: () {_skip_next();},),
+          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_previous) ,onPressed: () {_player.skip_prev();},),
+          new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () { _player.playOrPause();},),
+          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_next) ,onPressed: () {_player.skip_next();},),
           new IconButton(icon: new Icon (Icons.loop) ,onPressed: () {},),
           ])
       )
@@ -547,7 +595,7 @@ class EntryItem extends StatelessWidget {
                               print('tap2!');
                               //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
                               //crt.audioCache.playBytes(bytes);
-                              crt._playTrackStream(l);
+                              crt._player.playTrackStream(l);
                             },
                             child: 
                           Column(children: [
@@ -570,9 +618,9 @@ class EntryItem extends StatelessWidget {
     return _buildTiles(l, context);
   }
 }
-class SubbRedditButton extends StatelessWidget {
+class PlaylistButton extends StatelessWidget {
 
-  const SubbRedditButton(this.sub, this.crState);
+  const PlaylistButton(this.sub, this.crState);
 
   final Playlist sub;
   final _CategoryRouteState crState;
@@ -607,9 +655,9 @@ class SubbRedditButton extends StatelessWidget {
 }
 
 /////////////////////////////////
-
-void main() {
-  
+const debug = true;
+void main() async {
+  await FlutterDownloader.initialize(debug: debug);
   runApp(MyApp());
 }
 
@@ -639,10 +687,13 @@ class MyApp extends StatelessWidget {
 
 /// This is the stateful widget that the main application instantiates.
 class MyStatefulWidget extends StatefulWidget {
-  const MyStatefulWidget({Key? key}) : super(key: key);
+  const MyStatefulWidget(this.crt, {Key? key}) : super(key: key);
+
+  final _CategoryRouteState crt;
+
 
   @override
-  State<MyStatefulWidget> createState() => _MyStatefulWidgetState();
+  State<MyStatefulWidget> createState() => _MyStatefulWidgetState(crt);
 }
 
 /// This is the private State class that goes with MyStatefulWidget.
@@ -650,6 +701,11 @@ class MyStatefulWidget extends StatefulWidget {
 class _MyStatefulWidgetState extends State<MyStatefulWidget>
     with TickerProviderStateMixin {
   late AnimationController controller;
+
+  final _CategoryRouteState crt;
+  double progressBarValue = 0.0;
+
+  _MyStatefulWidgetState(this.crt);
 
   @override
   void initState() {
@@ -659,7 +715,7 @@ class _MyStatefulWidgetState extends State<MyStatefulWidget>
     )..addListener(() {
         setState(() {});
       });
-    controller.repeat(reverse: true);
+    //controller.repeat(reverse: true);
     super.initState();
   }
 
@@ -679,7 +735,7 @@ class _MyStatefulWidgetState extends State<MyStatefulWidget>
           children: <Widget>[
 
             LinearProgressIndicator(
-              value: controller.value,
+              value: 0.0, //crt._player.assetsAudioPlayer.currentPosition.inSeconds.toDouble() / crt._player.assetsAudioPlayer.duration.inSeconds.toDouble()
               semanticsLabel: 'Linear progress indicator',
             ),
           ],
@@ -687,4 +743,29 @@ class _MyStatefulWidgetState extends State<MyStatefulWidget>
       )
     ;
   }
+}
+
+
+
+
+
+
+
+
+class _TaskInfo {
+  final String? name;
+  final String? link;
+
+  String? taskId;
+  int? progress = 0;
+  DownloadTaskStatus? status = DownloadTaskStatus.undefined;
+
+  _TaskInfo({this.name, this.link});
+}
+
+class _ItemHolder {
+  final String? name;
+  final _TaskInfo? task;
+
+  _ItemHolder({this.name, this.task});
 }

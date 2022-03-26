@@ -37,6 +37,10 @@ dependencies:
   provider: ^5.0.0
   assets_audio_player: ^3.0.3+3
   infinite_scroll_pagination: ^3.0.1+1
+  flutter_downloader: ^1.7.1
+  android_path_provider: ^0.3.0
+  device_info_plus: ^3.2.2
+  permission_handler: ^8.1.6
 
 dev_dependencies:
   flutter_test:

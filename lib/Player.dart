@@ -1,13 +1,24 @@
 import 'dart:collection';
 import 'dart:math';
+import 'dart:isolate';
+import 'dart:io';
 
 import 'package:flutter_music_app/AppDatabase.dart';
 import 'package:path/path.dart';
+
+import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
+import 'package:android_path_provider/android_path_provider.dart';
+import 'package:path_provider/path_provider.dart';
+
+
+
 
 import 'Track.dart';
 
 import 'AppDatabase.dart';
 import 'API.dart';
+import 'Playlist.dart';
+
 import 'Playlist.dart';
 
 
@@ -22,11 +33,15 @@ enum LoopMode {
   all
 }
 
+const String STREAM_URL = "http://192.168.0.105:3000/api/track/";
+
 class Player {
 
   //static int THREASH = 512;
 
   Player();
+
+  AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
 
   //Track current;
   Track ? current;
@@ -42,10 +57,30 @@ class Player {
 
   bool isLooping = false;
   bool isShuffle = false;
+  
+  
 
   //bool isLargePlaylist = false;
   //DoubleLinkedQueue < int > queue; // 128 max length
   //Set < int > set;
+
+  @override
+  void initState() {
+
+    assetsAudioPlayer.playlistAudioFinished.listen((Playing playing){
+      print(" music finished");
+
+      //if (assetsAudioPlayer.isPlaying.value) {
+      //  skip_next();
+      //}
+
+      
+      
+    });
+
+  }
+
+  
 
   void loadPlaylist(Playlist playlist) async {
 
@@ -97,7 +132,8 @@ class Player {
       if (_vs == PlayContext.all) {
 
         Track c = current as Track;
-        print(" ________________________________________________________________________________________________________________________oid " + c.oid.toString());
+        print("________________________________________________________________________oid " + c.name);
+        print("________________________________________________________________________oid " + c.oid.toString());
 
         Track next = await AppDatabase.fetchNextTrack(c.oid as String, "");
         print("________________________________________" + next.name);
@@ -141,6 +177,14 @@ class Player {
           }
           */
 
+        } else {
+            if (current_ind == _tracks.length-1) {
+              current_ind = 0;
+            } else {
+              current_ind = current_ind+1;
+            }
+  
+            return _tracks[current_ind];
         }
       }
 
@@ -174,6 +218,94 @@ class Player {
       }
     }
     throw Exception();
+  }
+
+  // moving functions
+
+  void playOrPause() {
+    assetsAudioPlayer.playOrPause();
+  }
+
+  void playTrackStream(Track track) async {
+
+    current = track;
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      
+      try {
+          assetsAudioPlayer.stop();
+          await assetsAudioPlayer.open(
+              Audio.network(STREAM_URL+track.id)
+          );
+
+          //assetsAudioPlayer.open(
+          //  Audio("assets/DROELOE - Taking Flight.flac"),
+          //);
+          
+          print('playing!');
+      } catch (t) {
+          print('could not play!');
+      }
+
+    } else if (Platform.isWindows) {
+
+    }
+    
+  }
+
+  void play_pause() {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      assetsAudioPlayer.playOrPause();
+    } else if (Platform.isWindows) {
+      
+    }
+  }
+
+  void skip_next() async {
+    print('Player: skip_next()!');
+
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      assetsAudioPlayer.stop();
+      try {
+        Track t = await getNextTrack();
+        current = t;
+        
+        await assetsAudioPlayer.open(
+            Audio.network(STREAM_URL+t.id)
+        );
+
+        /*
+        if (current != null) {
+          await assetsAudioPlayer.open(
+            //Audio.network("http://192.168.0.105:3000/api/track/"+ (current?.id as String))
+        );
+        }
+        */
+        
+      } catch (e) {
+
+      }
+
+    } else if (Platform.isWindows) {
+      
+    }
+  }
+
+  void skip_prev() async {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      assetsAudioPlayer.stop();
+      try {
+        Track t = await getPrevTrack();
+        current = t;
+        await assetsAudioPlayer.open(
+            Audio.network(STREAM_URL+t.id)
+        );
+      } catch (e) {
+
+      }
+    } else if (Platform.isWindows) {
+      
+    }
   }
 
 }
