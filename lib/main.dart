@@ -7,12 +7,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
-
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:android_path_provider/android_path_provider.dart';
+import 'package:path/path.dart' as path_lib;
 import 'dart:isolate';
 import 'dart:ui';
 
@@ -25,26 +25,30 @@ import 'Player.dart';
 /*
 todo
 
-download played songs
+play next song/next song in playlist
 shuffle playing
+looping
 
 store playlist data in local json files
+drag and drop song into playlist
 download playlists
 
 add settings menu
 
-sort order by
+sort order by (song name/ artist/ date/ last played/ playcount)
 date_added
 artist name
 song name
 duration
+
+sync(play count/ last date played)
+delete (unchecked/ least played songs)
+
+artist view
+album view
 */
 
-enum ViewState {
-  all,
-  playlist
-}
-
+enum ViewState { all, playlist }
 
 class Choice {
   const Choice(String this.title, IconData this.icon);
@@ -69,8 +73,6 @@ class CategoryRoute extends StatefulWidget {
 ReceivePort _port = ReceivePort();
 
 class _CategoryRouteState extends State<CategoryRoute> {
-
-  
   String? localFilePath;
 
   List<Track> _tracks = <Track>[];
@@ -80,19 +82,15 @@ class _CategoryRouteState extends State<CategoryRoute> {
   String sortOrder = 'best';
 
   ViewState _vs = ViewState.all;
-
   List<Playlist> _playlists = [];
 
   Player _player = Player();
-
   Track? current;
 
   final int _pageSize = 128;
 
   final PagingController<int, Track> _pagingController =
       PagingController(firstPageKey: 0);
-
-  //bool _isPlaylist = false;
 
   late String _localPath;
   late bool _permissionReady;
@@ -111,28 +109,32 @@ class _CategoryRouteState extends State<CategoryRoute> {
   @override
   void initState() {
     super.initState();
-    
-    IsolateNameServer.registerPortWithName(_port.sendPort, 'downloader_send_port');
+
+    IsolateNameServer.registerPortWithName(
+        _port.sendPort, 'downloader_send_port');
     _port.listen((dynamic data) {
       String id = data[0];
       DownloadTaskStatus status = data[1];
       int progress = data[2];
-      setState((){ });
+      setState(() {});
     });
-    
 
     FlutterDownloader.registerCallback(downloadCallback);
 
-
     //DateTime.parse("2000-07-20 20:18:04Z")
-    _tracks.add(new Track("Taking Flight", "456", "DROELOE - Taking Flight.flac", artist:"DROELOE"));
-    _tracks.add(new Track("Happy Endings", "456", "Mike Shinoda - Happy Endings (feat. iann dior and UPSAHL).flac", artist:"Mike Shinoda"));
-    _tracks.add(new Track("The end", "456", "audio.mp3", artist:"the backenders"));
+    _tracks.add(new Track(
+        "Taking Flight", "456", "DROELOE - Taking Flight.flac",
+        artist: "DROELOE"));
+    _tracks.add(new Track("Happy Endings", "456",
+        "Mike Shinoda - Happy Endings (feat. iann dior and UPSAHL).flac",
+        artist: "Mike Shinoda"));
+    _tracks.add(
+        new Track("The end", "456", "audio.mp3", artist: "the backenders"));
 
     //AppDatabase.openConnection().then((value) => this.refresh());
 
-    AppDatabase.openConnection().then((value) => loadPlaylist(new Playlist("All", "#ALL#")));
-
+    AppDatabase.openConnection()
+        .then((value) => loadPlaylist(new Playlist("All", "#ALL#")));
 
     _pagingController.addPageRequestListener((pageKey) {
       _fetchPage(pageKey);
@@ -141,24 +143,59 @@ class _CategoryRouteState extends State<CategoryRoute> {
     _permissionReady = false;
     _isLoading = true;
     _prepare();
-    
 
     fetchPlaylists2();
 
     print(" initState" + _tracks.length.toString());
   }
 
-  static void downloadCallback(String id, DownloadTaskStatus status, int progress) {
-    final SendPort send = IsolateNameServer.lookupPortByName('downloader_send_port')!;
+  static void downloadCallback(
+      String id, DownloadTaskStatus status, int progress) {
+    final SendPort send =
+        IsolateNameServer.lookupPortByName('downloader_send_port')!;
     send.send([id, status, progress]);
   }
 
-  /////////////////////
-  ///
-  ///
-  ///
-  ///
-  ///
+  Future<String> prepTrackDir(Track track) async {
+    String trackLibDir = (await _findLocalPath())!;
+
+    final dirname = path_lib.dirname(track.file_path);
+    final trackDir = path_lib.join(trackLibDir, dirname);
+    final savedDir = Directory(trackDir);
+    bool hasExisted = await savedDir.exists();
+
+    if (!hasExisted) {
+      savedDir.create();
+    }
+    return trackDir;
+  }
+
+  void downloadTrack(Track track) async {
+    _permissionReady = await _checkPermission();
+    if (_permissionReady) {
+      var saveDir = await prepTrackDir(track);
+
+      var file_path =
+          path_lib.join(saveDir, path_lib.basename(track.file_path));
+      print("downloading to: " + file_path);
+
+      var checkDuplicate = File(file_path);
+
+      if (checkDuplicate.existsSync()) {
+        //do nothing
+      } else {
+        //download
+        var url = "http://192.168.0.105:3000/api/track/" + track.id;
+        var id = await FlutterDownloader.enqueue(
+          url: url,
+          savedDir: saveDir,
+          fileName: path_lib.basename(track.file_path),
+          showNotification: true,
+          openFileFromNotification: true,
+        );
+      }
+    }
+  }
 
   void _requestDownload(_TaskInfo task) async {
     task.taskId = await FlutterDownloader.enqueue(
@@ -175,13 +212,16 @@ class _CategoryRouteState extends State<CategoryRoute> {
     _permissionReady = await _checkPermission();
     if (_permissionReady) {
       await _prepareSaveDir();
-      _requestDownload(_TaskInfo(name: "Cool", link: "http://192.168.0.105:3000/api/track/60fa29525e7aac00381c88ef"));
+      //_requestDownload(_TaskInfo(
+      //    name: "Cool",
+      //    link:
+      //        "http://192.168.0.105:3000/api/track/627dd09f3fefdf002d0d2681"));
     }
     setState(() {
       _isLoading = false;
     });
   }
-  
+
   Future<bool> _checkPermission() async {
     if (Platform.isIOS) return true;
 
@@ -214,7 +254,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
     var externalStorageDirPath;
     if (Platform.isAndroid) {
       try {
-        externalStorageDirPath = await AndroidPathProvider.musicPath+"/Whale Music";
+        externalStorageDirPath =
+            await AndroidPathProvider.musicPath + "/Whale Music";
       } catch (e) {
         final directory = await getExternalStorageDirectory();
         externalStorageDirPath = directory?.path;
@@ -226,51 +267,40 @@ class _CategoryRouteState extends State<CategoryRoute> {
     return externalStorageDirPath;
   }
 
-  
-
   fetchPlaylists2() async {
-
+    //print(" fetchPlaylists" + _playlists.length.toString());
     try {
       List<Playlist> playlists = await Api.fetchPlaylists("", "");
-
       playlists.add(new Playlist("All Music", "#ALL#"));
 
       setState(() {
-      _playlists = playlists;
-      _vs = ViewState.playlist;
+        _playlists = playlists;
+        _vs = ViewState.playlist;
       });
-
     } catch (e) {
       print("fetchPlaylists2 error: " + e.toString());
     }
-
-    //print(" fetchPlaylists" + _playlists.length.toString());
   }
 
   Future<void> _fetchPage(pageKey) async {
     //try {
 
-      if (_vs == ViewState.all) {
+    if (_vs == ViewState.all) {
+      List<Track> newItems = [];
+      newItems.addAll(await AppDatabase.fetchTracksPage(_pageSize, pageKey));
 
-        List<Track> newItems = [];
-        newItems.addAll(await AppDatabase.fetchTracksPage(_pageSize,pageKey));
-
-        final isLastPage = newItems.length < _pageSize;
-        if (isLastPage) {
-          _pagingController.appendLastPage(newItems);
-        } else {
-          final nextPageKey = pageKey + newItems.length;
-          _pagingController.appendPage(newItems, nextPageKey);
-        }
-
-      } else if (_vs == ViewState.playlist) {
-
-        _pagingController.appendLastPage(_tracks);
-        
+      final isLastPage = newItems.length < _pageSize;
+      if (isLastPage) {
+        _pagingController.appendLastPage(newItems);
+      } else {
+        final nextPageKey = pageKey + newItems.length;
+        _pagingController.appendPage(newItems, nextPageKey);
       }
-      
+    } else if (_vs == ViewState.playlist) {
+      _pagingController.appendLastPage(_tracks);
+    }
 
-      //_pagingController.appendPage(data, pageKey+data.length);
+    //_pagingController.appendPage(data, pageKey+data.length);
     //} catch (error) {
     //  _pagingController.error = error;
     //}
@@ -293,23 +323,35 @@ class _CategoryRouteState extends State<CategoryRoute> {
     });
   }
 
-  void _openTrack() {
+  void _openTrack() {}
 
+  void _playTrack(Track t) async {
+    if (Platform.isAndroid) {
+      _permissionReady = await _checkPermission();
+      if (_permissionReady) {
+        //var saveDir = await prepTrackDir(t);
+        String trackLibDir = (await _findLocalPath())!;
+
+        final dirname = path_lib.dirname(t.file_path);
+
+        final trackDir = path_lib.join(trackLibDir, dirname);
+        var filePath = path_lib.join(trackDir, path_lib.basename(t.file_path));
+
+        var checkFile = File(filePath);
+
+        if (checkFile.existsSync()) {
+          _player.assetsAudioPlayer.open(
+            Audio.file(filePath),
+          );
+        } else {
+          _player.playTrackStream(t);
+          downloadTrack(t); // queue for download
+        }
+      }
+    } else if (Platform.isIOS) {
+    } else if (Platform.isWindows) {}
   }
 
-  void _playTrack(String path) {
-
-    if (Platform.isAndroid || Platform.isIOS) {
-
-
-      
-    } else if (Platform.isWindows) {
-
-    }
-    
-  }
-
-  
 /*
   Future<Track> getNextTrack() async {
     if (current != null) {
@@ -332,10 +374,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
     throw Exception();
   }
 */
-  
 
   void refresh() async {
-
     final tracks = await Api.fetchTracks("track", sortOrder);
 
     for (int i = 0; i < tracks.length; i++) {
@@ -350,11 +390,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
       _tracks = tracks2;
       _pagingController.refresh();
     });
-
   }
 
   void refreshPlaylists() async {
-
     List<Playlist> playlists = await Api.fetchPlaylists("track", sortOrder);
 
     setState(() {
@@ -362,36 +400,31 @@ class _CategoryRouteState extends State<CategoryRoute> {
       _playlists = playlists;
       _pagingController.refresh();
     });
-
   }
 
   void loadPlaylist(Playlist playlist) async {
-
     if (playlist.id == "#ALL#") {
-      
       final tracks2 = await AppDatabase.fetchTracks();
-      
+
       setState(() {
-      _vs = ViewState.all;
-      _tracks = tracks2;
-      _pagingController.refresh();
-    });
-      
+        _vs = ViewState.all;
+        _tracks = tracks2;
+        _pagingController.refresh();
+      });
     } else {
       final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
-      final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);//fetchTracksByPlaylist
+      final tracks2 = await AppDatabase.fetchPlaylistTracks(
+          tracksids); //fetchTracksByPlaylist
 
       setState(() {
-      _vs = ViewState.playlist;
-      _tracks = tracks2;
-      _pagingController.refresh();
-    });
-      
+        _vs = ViewState.playlist;
+        _tracks = tracks2;
+        _pagingController.refresh();
+      });
     }
 
-    final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
-    final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
-
+    //final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
+    //final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
     //_pagingController.appendLastPage(tracks2);
   }
 
@@ -400,28 +433,21 @@ class _CategoryRouteState extends State<CategoryRoute> {
     return new DefaultTabController(
         length: 3,
         child: new Scaffold(
-      drawer: new Drawer(
+          drawer: new Drawer(
 
-          //child: new Padding(
-          //    padding: new EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-          child:
-          Container(
-              //height: MediaQuery.of(context).size.height,
-              child:
-              new ListView.builder(
-
-                //padding: new EdgeInsets.all(8.0),
-                itemExtent: 40.0,
-                itemCount: _playlists.length,
-                itemBuilder: (BuildContext context, int index) {
-                  return new PlaylistButton(_playlists[index], this);
-                },
-              )
-
-          )
-      ),
-      appBar:
-          new AppBar(
+              //child: new Padding(
+              //    padding: new EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+              child: Container(
+                  //height: MediaQuery.of(context).size.height,
+                  child: new ListView.builder(
+            //padding: new EdgeInsets.all(8.0),
+            itemExtent: 40.0,
+            itemCount: _playlists.length,
+            itemBuilder: (BuildContext context, int index) {
+              return new PlaylistButton(_playlists[index], this);
+            },
+          ))),
+          appBar: new AppBar(
               title: const Text('Whale Music'),
               bottom: new PreferredSize(
                 preferredSize: const Size.fromHeight(48.0),
@@ -430,109 +456,145 @@ class _CategoryRouteState extends State<CategoryRoute> {
                   child: new Container(
                     height: 48.0,
                     alignment: Alignment.center,
-                    child:
-
-
-                    Row(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: <Widget>[
-                        new Expanded( child: InkWell ( child: Center(child: Text('Best'),), onTap:() {sortOrder = 'best'; refresh(); } ,)),
-                        new Expanded( child: InkWell ( child: Center(child: Text('Hot'),), onTap: () {sortOrder = 'hot'; refresh();   } ,)),
-                        new Expanded( child: InkWell ( child: Center(child: Text('New'),), onTap: () {sortOrder = 'new'; refresh();   })),
-                        new Expanded( child: InkWell ( child: Center(child: Text('Top'),), onTap: () {sortOrder = 'top'; refresh();   })),
-
+                        new Expanded(
+                            child: InkWell(
+                          child: Center(
+                            child: Text('Best'),
+                          ),
+                          onTap: () {
+                            sortOrder = 'best';
+                            refresh();
+                          },
+                        )),
+                        new Expanded(
+                            child: InkWell(
+                          child: Center(
+                            child: Text('Hot'),
+                          ),
+                          onTap: () {
+                            sortOrder = 'hot';
+                            refresh();
+                          },
+                        )),
+                        new Expanded(
+                            child: InkWell(
+                                child: Center(
+                                  child: Text('New'),
+                                ),
+                                onTap: () {
+                                  sortOrder = 'new';
+                                  refresh();
+                                })),
+                        new Expanded(
+                            child: InkWell(
+                                child: Center(
+                                  child: Text('Top'),
+                                ),
+                                onTap: () {
+                                  sortOrder = 'top';
+                                  refresh();
+                                })),
                       ],
-                    )
-
-                    ,
+                    ),
                   ),
                 ),
               ),
               actions: <Widget>[
-        new IconButton(
-          icon: new Icon(Icons.refresh),
-          onPressed: () async {
-
-            refresh();
-
-          },
-        ),
-        new PopupMenuButton<Choice>(
-          onSelected: _select,
-          itemBuilder: (BuildContext context) {
-            return choices.map((Choice choice) {
-              return new PopupMenuItem<Choice>(
-                value: choice,
-                child: new Text(choice.title),
-                onTap: () async {
-                  refreshPlaylists();
-                },
-              );
-            }).toList();
-          },
-        )
-      ]),
-
-      bottomNavigationBar: 
-      new Container(child : 
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
+                new IconButton(
+                  icon: new Icon(Icons.refresh),
+                  onPressed: () async {
+                    refresh();
+                  },
+                ),
+                new PopupMenuButton<Choice>(
+                  onSelected: _select,
+                  itemBuilder: (BuildContext context) {
+                    return choices.map((Choice choice) {
+                      return new PopupMenuItem<Choice>(
+                        value: choice,
+                        child: new Text(choice.title),
+                        onTap: () async {
+                          refreshPlaylists();
+                        },
+                      );
+                    }).toList();
+                  },
+                )
+              ]),
+          bottomNavigationBar: new Container(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     MyStatefulWidget(this),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(6.0, 0.0, 6.0, 6.0),
-        child:
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(6.0, 0.0, 6.0, 6.0),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              new IconButton(
+                                icon: new Icon(Icons.shuffle),
+                                onPressed: () {},
+                              ),
+                              new IconButton(
+                                iconSize: 40,
+                                icon: new Icon(Icons.skip_previous),
+                                onPressed: () {
+                                  _player.skip_prev();
+                                },
+                              ),
+                              new IconButton(
+                                iconSize: 60,
+                                icon: new Icon(Icons.play_arrow),
+                                onPressed: () {
+                                  _player.playOrPause();
+                                },
+                              ),
+                              new IconButton(
+                                iconSize: 40,
+                                icon: new Icon(Icons.skip_next),
+                                onPressed: () {
+                                  _player.skip_next();
+                                },
+                              ),
+                              new IconButton(
+                                icon: new Icon(Icons.loop),
+                                onPressed: () {},
+                              ),
+                            ]))
+                  ]),
+              decoration: new BoxDecoration(
+                color: Colors.grey[400],
+              )) //Text("Player here", style: new TextStyle(fontSize: 16),)
+          ,
+          body: _vs == ViewState.playlist
+              ? ListView.builder(
+                  itemCount: _tracks.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    return new EntryItem(_tracks[index], index, this);
+                  },
+                )
+              : PagedListView<int, Track>(
+                  pagingController: _pagingController,
+                  builderDelegate: PagedChildBuilderDelegate<Track>(
+                    itemBuilder: (context, item, index) =>
+                        EntryItem(item, index, this),
+                  ),
+                )
 
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-          new IconButton(icon: new Icon (Icons.shuffle) ,onPressed: () {},),
-          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_previous) ,onPressed: () {_player.skip_prev();},),
-          new IconButton(iconSize: 60,icon: new Icon (Icons.play_arrow) ,onPressed: () { _player.playOrPause();},),
-          new IconButton(iconSize: 40,icon: new Icon (Icons.skip_next) ,onPressed: () {_player.skip_next();},),
-          new IconButton(icon: new Icon (Icons.loop) ,onPressed: () {},),
-          ])
-      )
-      ])
-        ,
-        decoration: new BoxDecoration(
-          color: Colors.grey[400],
-                  )
-      )//Text("Player here", style: new TextStyle(fontSize: 16),)
-      ,
-      
-      body: 
-      
-      _vs == ViewState.playlist ?
-      ListView.builder(
-        itemCount: _tracks.length,
-        itemBuilder: (BuildContext context, int index) {
-          return new EntryItem(_tracks[index], index, this);
-        },
-      )
-      :
-        PagedListView<int, Track>(
-          pagingController: _pagingController,
-          builderDelegate: PagedChildBuilderDelegate<Track>(
-            itemBuilder: (context, item, index) => 
-            EntryItem(
-              item, index,this
-              ),
-          ),
-        )
-        
-
-      /*
+          /*
       new ListView.builder(
         itemBuilder:  (BuildContext context, int index) {
             return new EntryItem( _tracks[index] , index, this);}, // return sql query here? _tracks[index]  AppDatabase.fetchTrack(index)
         itemCount: _tracks.length,//,
       )
       */
-      ,
-    ));
+          ,
+        ));
   }
 }
 
@@ -554,61 +616,59 @@ class EntryItem extends StatelessWidget {
         },
         onHorizontalDragEnd: (DragEndDetails d) async {
           print("dragEnd");
-
         },
         child: Row(children: [
-          
           new Flexible(
-              
-              
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 new Container(
                     //margin: const EdgeInsets.all(8.0),
-                    
-                    child:Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      
-                      children: [
-                        new Container(
-                          //margin: const EdgeInsets.all(0.0),
-                          child:Row( children: [
+
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          new Container(
+                              //margin: const EdgeInsets.all(0.0),
+                              child: Row(children: [
                             SizedBox(
-                            height: 40.0,
-                            width: 40.0,
-                            child:
-                            Checkbox(
-                              
-                              value: l.is_active, onChanged: (b) {
-                              //l.is_active = b as bool;
-                              })
+                                height: 40.0,
+                                width: 40.0,
+                                child: Checkbox(
+                                    value: l.is_active,
+                                    onChanged: (b) {
+                                      //l.is_active = b as bool;
+                                    })),
+                            new Align(
+                              //alignment: Alignment.topLeft,
+                              child: InkWell(
+                                  splashColor: Colors.deepOrange,
+                                  highlightColor: Colors.deepPurple,
+                                  onTap: () async {
+                                    print('tap2!');
+                                    //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
+                                    //crt.audioCache.playBytes(bytes);
+                                    crt._playTrack(l);
+                                  },
+                                  child: Column(children: [
+                                    Text(
+                                      l.artist +
+                                          " - " +
+                                          l.name +
+                                          l.file_path +
+                                          "(" +
+                                          l.oid.toString(),
+                                      style: new TextStyle(fontSize: 13),
+                                    )
+                                  ])),
                             )
-                              ,
-                        new Align(
-                          //alignment: Alignment.topLeft,
-                          child: 
-                          InkWell(
-                            splashColor: Colors.deepOrange,
-                            highlightColor: Colors.deepPurple,
-                            onTap: () async {
-                              print('tap2!');
-                              //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
-                              //crt.audioCache.playBytes(bytes);
-                              crt._player.playTrackStream(l);
-                            },
-                            child: 
-                          Column(children: [
-                            Text(l.artist + " - " + l.name+l.oid.toString(), style: new TextStyle(fontSize: 13),)
-                          ])),
-                        )]
-                        )
-                        )//,
-                      ]),
-                  decoration: new BoxDecoration(
-                    color: index % 2 == 1 ?  Colors.grey[200]: Colors.grey[50],
-                  )),
-                 //Text('<cmts> (<sub>)')
+                          ])) //,
+                        ]),
+                    decoration: new BoxDecoration(
+                      color:
+                          index % 2 == 1 ? Colors.grey[200] : Colors.grey[50],
+                    )),
+                //Text('<cmts> (<sub>)')
               ]))
         ]));
   }
@@ -618,8 +678,8 @@ class EntryItem extends StatelessWidget {
     return _buildTiles(l, context);
   }
 }
-class PlaylistButton extends StatelessWidget {
 
+class PlaylistButton extends StatelessWidget {
   const PlaylistButton(this.sub, this.crState);
 
   final Playlist sub;
@@ -628,28 +688,17 @@ class PlaylistButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-          onTap: () async {
-
-            crState.setState(
-                    () {
-              crState.currentSub = sub;
-            }
-            );
-            crState.loadPlaylist(sub);
-            crState.refresh();
-            print(crState.currentSub);
-
-          },
-        child:
-      new Container(
-        //margin: EdgeInsets.,
-      child:
-        Text(
-            sub.name,
-            style: new TextStyle(fontSize: 32.0)
-        )
-      )
-      ,
+      onTap: () async {
+        crState.setState(() {
+          crState.currentSub = sub;
+        });
+        crState.loadPlaylist(sub);
+        crState.refresh();
+        print(crState.currentSub);
+      },
+      child: new Container(
+          //margin: EdgeInsets.,
+          child: Text(sub.name, style: new TextStyle(fontSize: 32.0))),
     );
   }
 }
@@ -677,20 +726,18 @@ class MyApp extends StatelessWidget {
         // or simply save your changes to "hot reload" in a Flutter IDE).
         // Notice that the counter didn't reset back to zero; the application
         // is not restarted.
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.grey,
       ),
-      home: CategoryRoute(),//MyHomePage(title: 'Whale Music Home'),
+      home: CategoryRoute(), //MyHomePage(title: 'Whale Music Home'),
     );
   }
 }
-
 
 /// This is the stateful widget that the main application instantiates.
 class MyStatefulWidget extends StatefulWidget {
   const MyStatefulWidget(this.crt, {Key? key}) : super(key: key);
 
   final _CategoryRouteState crt;
-
 
   @override
   State<MyStatefulWidget> createState() => _MyStatefulWidgetState(crt);
@@ -728,29 +775,21 @@ class _MyStatefulWidgetState extends State<MyStatefulWidget>
   @override
   Widget build(BuildContext context) {
     return Padding(
-        padding: const EdgeInsets.fromLTRB(10.0, 10.0, 10.0, 4.0),
-        child: Column(
-          //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-
-            LinearProgressIndicator(
-              value: 0.0, //crt._player.assetsAudioPlayer.currentPosition.inSeconds.toDouble() / crt._player.assetsAudioPlayer.duration.inSeconds.toDouble()
-              semanticsLabel: 'Linear progress indicator',
-            ),
-          ],
-        ),
-      )
-    ;
+      padding: const EdgeInsets.fromLTRB(10.0, 10.0, 10.0, 4.0),
+      child: Column(
+        //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          LinearProgressIndicator(
+            value:
+                0.0, //crt._player.assetsAudioPlayer.currentPosition.inSeconds.toDouble() / crt._player.assetsAudioPlayer.duration.inSeconds.toDouble()
+            semanticsLabel: 'Linear progress indicator',
+          ),
+        ],
+      ),
+    );
   }
 }
-
-
-
-
-
-
-
 
 class _TaskInfo {
   final String? name;
