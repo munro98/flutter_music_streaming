@@ -25,12 +25,12 @@ import 'Player.dart';
 /*
 todo
 
-play next song/next song in playlist
 shuffle playing
 looping
-
 store playlist data in local json files
+able to enable/disable songs in library and playlists
 drag and drop song into playlist
+show songs available on local storage
 download playlists
 
 add settings menu
@@ -43,6 +43,8 @@ duration
 
 sync(play count/ last date played)
 delete (unchecked/ least played songs)
+
+
 
 artist view
 album view
@@ -77,7 +79,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   List<Track> _tracks = <Track>[];
   Map<int, Track> _tMap = Map<int, Track>();
-  Playlist currentSub = new Playlist("o", "123");
+  Playlist currentPlayList = new Playlist("#ALL#", "#ALL#");
   Choice _selectedChoice = choices[0];
   String sortOrder = 'best';
 
@@ -97,14 +99,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
   List<_TaskInfo>? _tasks;
   late List<_ItemHolder> _items;
   late bool _isLoading;
-
-  final _images = [
-    {
-      'name': 'Arches National Park',
-      'link':
-          'https://upload.wikimedia.org/wikipedia/commons/7/78/Canyonlands_National_Park%E2%80%A6Needles_area_%286294480744%29.jpg'
-    }
-  ];
 
   @override
   void initState() {
@@ -142,11 +136,17 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
     _permissionReady = false;
     _isLoading = true;
-    _prepare();
+    _player.init(currentPlayList);
 
     fetchPlaylists2();
 
     print(" initState" + _tracks.length.toString());
+  }
+
+  @override
+  void dispose() {
+    IsolateNameServer.removePortNameMapping('downloader_send_port');
+    super.dispose();
   }
 
   static void downloadCallback(
@@ -154,117 +154,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
     final SendPort send =
         IsolateNameServer.lookupPortByName('downloader_send_port')!;
     send.send([id, status, progress]);
-  }
-
-  Future<String> prepTrackDir(Track track) async {
-    String trackLibDir = (await _findLocalPath())!;
-
-    final dirname = path_lib.dirname(track.file_path);
-    final trackDir = path_lib.join(trackLibDir, dirname);
-    final savedDir = Directory(trackDir);
-    bool hasExisted = await savedDir.exists();
-
-    if (!hasExisted) {
-      savedDir.create();
-    }
-    return trackDir;
-  }
-
-  void downloadTrack(Track track) async {
-    _permissionReady = await _checkPermission();
-    if (_permissionReady) {
-      var saveDir = await prepTrackDir(track);
-
-      var file_path =
-          path_lib.join(saveDir, path_lib.basename(track.file_path));
-      print("downloading to: " + file_path);
-
-      var checkDuplicate = File(file_path);
-
-      if (checkDuplicate.existsSync()) {
-        //do nothing
-      } else {
-        //download
-        var url = "http://192.168.0.105:3000/api/track/" + track.id;
-        var id = await FlutterDownloader.enqueue(
-          url: url,
-          savedDir: saveDir,
-          fileName: path_lib.basename(track.file_path),
-          showNotification: true,
-          openFileFromNotification: true,
-        );
-      }
-    }
-  }
-
-  void _requestDownload(_TaskInfo task) async {
-    task.taskId = await FlutterDownloader.enqueue(
-      url: task.link!,
-      headers: {"auth": "test_for_sql_encoding"},
-      savedDir: _localPath,
-      showNotification: true,
-      openFileFromNotification: true,
-      saveInPublicStorage: false,
-    );
-  }
-
-  Future<Null> _prepare() async {
-    _permissionReady = await _checkPermission();
-    if (_permissionReady) {
-      await _prepareSaveDir();
-      //_requestDownload(_TaskInfo(
-      //    name: "Cool",
-      //    link:
-      //        "http://192.168.0.105:3000/api/track/627dd09f3fefdf002d0d2681"));
-    }
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  Future<bool> _checkPermission() async {
-    if (Platform.isIOS) return true;
-
-    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-    AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-    if (Platform.isAndroid) {
-      final status = await Permission.storage.status;
-      if (status != PermissionStatus.granted) {
-        final result = await Permission.storage.request();
-        if (result == PermissionStatus.granted) {
-          return true;
-        }
-      } else {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  Future<void> _prepareSaveDir() async {
-    _localPath = (await _findLocalPath())!;
-    final savedDir = Directory(_localPath);
-    bool hasExisted = await savedDir.exists();
-    if (!hasExisted) {
-      savedDir.create();
-    }
-  }
-
-  Future<String?> _findLocalPath() async {
-    var externalStorageDirPath;
-    if (Platform.isAndroid) {
-      try {
-        externalStorageDirPath =
-            await AndroidPathProvider.musicPath + "/Whale Music";
-      } catch (e) {
-        final directory = await getExternalStorageDirectory();
-        externalStorageDirPath = directory?.path;
-      }
-    } else if (Platform.isIOS) {
-      externalStorageDirPath =
-          (await getApplicationDocumentsDirectory()).absolute.path;
-    }
-    return externalStorageDirPath;
   }
 
   fetchPlaylists2() async {
@@ -323,58 +212,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
     });
   }
 
-  void _openTrack() {}
-
-  void _playTrack(Track t) async {
-    if (Platform.isAndroid) {
-      _permissionReady = await _checkPermission();
-      if (_permissionReady) {
-        //var saveDir = await prepTrackDir(t);
-        String trackLibDir = (await _findLocalPath())!;
-
-        final dirname = path_lib.dirname(t.file_path);
-
-        final trackDir = path_lib.join(trackLibDir, dirname);
-        var filePath = path_lib.join(trackDir, path_lib.basename(t.file_path));
-
-        var checkFile = File(filePath);
-
-        if (checkFile.existsSync()) {
-          _player.assetsAudioPlayer.open(
-            Audio.file(filePath),
-          );
-        } else {
-          _player.playTrackStream(t);
-          downloadTrack(t); // queue for download
-        }
-      }
-    } else if (Platform.isIOS) {
-    } else if (Platform.isWindows) {}
-  }
-
-/*
-  Future<Track> getNextTrack() async {
-    if (current != null) {
-      Track c = current as Track;
-      print(" ________________________________________________________________________________________________________________________oid " + c.oid.toString());
-
-      Track next = await AppDatabase.fetchNextTrack(c.oid as String , "");
-      print("________________________________________" + next.name);
-      return next;
-    }
-    throw Exception();
-  }
-
-  Future<Track> getPrevTrack() async {
-    if (current != null) {
-      Track c = current as Track;
-      Track next = await AppDatabase.fetchPrevTrack(c.oid as String , "");
-      return next;
-    }
-    throw Exception();
-  }
-*/
-
   void refresh() async {
     final tracks = await Api.fetchTracks("track", sortOrder);
 
@@ -394,6 +231,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   void refreshPlaylists() async {
     List<Playlist> playlists = await Api.fetchPlaylists("track", sortOrder);
+
+    playlists.insert(0, new Playlist("All Music", "#ALL#"));
 
     setState(() {
       _vs = ViewState.playlist;
@@ -417,6 +256,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
           tracksids); //fetchTracksByPlaylist
 
       setState(() {
+        currentPlayList = playlist;
         _vs = ViewState.playlist;
         _tracks = tracks2;
         _pagingController.refresh();
@@ -462,39 +302,39 @@ class _CategoryRouteState extends State<CategoryRoute> {
                         new Expanded(
                             child: InkWell(
                           child: Center(
-                            child: Text('Best'),
+                            child: Text('By Song'),
                           ),
                           onTap: () {
-                            sortOrder = 'best';
+                            sortOrder = 'song';
                             refresh();
                           },
                         )),
                         new Expanded(
                             child: InkWell(
                           child: Center(
-                            child: Text('Hot'),
+                            child: Text('Artist'),
                           ),
                           onTap: () {
-                            sortOrder = 'hot';
+                            sortOrder = 'artist';
                             refresh();
                           },
                         )),
                         new Expanded(
                             child: InkWell(
                                 child: Center(
-                                  child: Text('New'),
+                                  child: Text('Date'),
                                 ),
                                 onTap: () {
-                                  sortOrder = 'new';
+                                  sortOrder = 'date';
                                   refresh();
                                 })),
                         new Expanded(
                             child: InkWell(
                                 child: Center(
-                                  child: Text('Top'),
+                                  child: Text('Playlist'),
                                 ),
                                 onTap: () {
-                                  sortOrder = 'top';
+                                  sortOrder = 'playlist';
                                   refresh();
                                 })),
                       ],
@@ -648,7 +488,8 @@ class EntryItem extends StatelessWidget {
                                     print('tap2!');
                                     //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
                                     //crt.audioCache.playBytes(bytes);
-                                    crt._playTrack(l);
+                                    crt._player.play(l, crt.currentPlayList,
+                                        index, crt._tracks);
                                   },
                                   child: Column(children: [
                                     Text(
@@ -657,7 +498,7 @@ class EntryItem extends StatelessWidget {
                                           l.name +
                                           l.file_path +
                                           "(" +
-                                          l.oid.toString(),
+                                          index.toString(),
                                       style: new TextStyle(fontSize: 13),
                                     )
                                   ])),
@@ -680,25 +521,22 @@ class EntryItem extends StatelessWidget {
 }
 
 class PlaylistButton extends StatelessWidget {
-  const PlaylistButton(this.sub, this.crState);
+  const PlaylistButton(this.playList, this.crState);
 
-  final Playlist sub;
+  final Playlist playList;
   final _CategoryRouteState crState;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () async {
-        crState.setState(() {
-          crState.currentSub = sub;
-        });
-        crState.loadPlaylist(sub);
+        crState.loadPlaylist(playList);
         crState.refresh();
-        print(crState.currentSub);
+        print(crState.currentPlayList);
       },
       child: new Container(
           //margin: EdgeInsets.,
-          child: Text(sub.name, style: new TextStyle(fontSize: 32.0))),
+          child: Text(playList.name, style: new TextStyle(fontSize: 32.0))),
     );
   }
 }
