@@ -305,7 +305,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
                             child: Text('By Song'),
                           ),
                           onTap: () {
-                            sortOrder = 'song';
+                            sortOrder = 'name';
                             refresh();
                           },
                         )),
@@ -325,7 +325,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
                                   child: Text('Date'),
                                 ),
                                 onTap: () {
-                                  sortOrder = 'date';
+                                  sortOrder = 'added_date';
                                   refresh();
                                 })),
                         new Expanded(
@@ -496,9 +496,9 @@ class EntryItem extends StatelessWidget {
                                       l.artist +
                                           " - " +
                                           l.name +
-                                          l.file_path +
+                                          //l.file_path +
                                           "(" +
-                                          index.toString(),
+                                          l.oid.toString(),
                                       style: new TextStyle(fontSize: 13),
                                     )
                                   ])),
