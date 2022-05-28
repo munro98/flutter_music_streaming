@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
-import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -26,7 +25,6 @@ import 'Player.dart';
 todo
 
 play modes/sort order (song title/song title desc, artist/artist desc, date/date desc, playlist/playlist desc)
-highlight currently playing song
 shuffle playing
 looping
 store playlist data in local json files
@@ -72,10 +70,10 @@ class _CategoryRouteState extends State<CategoryRoute> {
   String? localFilePath;
 
   List<Track> _tracks = <Track>[];
-  Map<int, Track> _tMap = Map<int, Track>();
-  Playlist currentPlayList = new Playlist("#ALL#", "#ALL#");
+  Playlist _currentPlayList = new Playlist("#ALL#", "#ALL#");
+  Playlist _playingPlayList = new Playlist("#ALL#", "#ALL#");
   Choice _selectedChoice = choices[0];
-  String sortOrder = 'best';
+  String sortOrder = 'playlist';
 
   ViewState _vs = ViewState.all;
   List<Playlist> _playlists = [];
@@ -85,8 +83,12 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   final int _pageSize = 128;
 
-  final PagingController<int, Track> _pagingController =
-      PagingController(firstPageKey: 0);
+  Map<int, bool> _pageMapIsFetching = Map<int, bool>();
+  Map<int, List<Track>> _pageMap = Map<int, List<Track>>();
+  int _pageMapCount = 0;
+  int _trackCount = 0;
+
+  int _currentTrack = -1;
 
   late String _localPath;
   late bool _permissionReady;
@@ -124,15 +126,12 @@ class _CategoryRouteState extends State<CategoryRoute> {
     AppDatabase.openConnection()
         .then((value) => loadPlaylist(new Playlist("All", "#ALL#")));
 
-    _pagingController.addPageRequestListener((pageKey) {
-      _fetchPage(pageKey);
-    });
-
     _permissionReady = false;
     _isLoading = true;
-    _player.init(currentPlayList);
+    _player.init(_currentPlayList);
 
     fetchPlaylists2();
+    loadPlaylist(_currentPlayList);
 
     print(" initState" + _tracks.length.toString());
   }
@@ -161,43 +160,51 @@ class _CategoryRouteState extends State<CategoryRoute> {
         _vs = ViewState.playlist;
       });
     } catch (e) {
-      print("fetchPlaylists2 error: " + e.toString());
+      print("main.fetchPlaylists2 error: " + e.toString());
     }
   }
 
+  // TODO: figure when to remove data
   Future<void> _fetchPage(pageKey) async {
-    //try {
+    try {
+      if (_pageMapIsFetching.containsKey(pageKey)) return;
 
-    if (_vs == ViewState.all) {
-      List<Track> newItems = [];
-      newItems.addAll(await AppDatabase.fetchTracksPage(_pageSize, pageKey));
+      _pageMapIsFetching[pageKey] = true;
 
-      final isLastPage = newItems.length < _pageSize;
-      if (isLastPage) {
-        _pagingController.appendLastPage(newItems);
-      } else {
-        final nextPageKey = pageKey + newItems.length;
-        _pagingController.appendPage(newItems, nextPageKey);
-      }
-    } else if (_vs == ViewState.playlist) {
-      _pagingController.appendLastPage(_tracks);
+      var data = await AppDatabase.fetchTracksPage(_pageSize, pageKey);
+
+      print("main._fetchPage: GOT PAGE DATA: " + pageKey.toString());
+
+      int count = 0;
+      _pageMap.forEach((k, v) => {count += v.length});
+      count += data.length;
+
+      _pageMapIsFetching.remove(pageKey);
+
+      this.setState(() {
+        _pageMap[pageKey] = data;
+        _pageMapCount = count;
+      });
+    } catch (e) {
+      _pageMapIsFetching.remove(pageKey);
     }
-
-    //_pagingController.appendPage(data, pageKey+data.length);
-    //} catch (error) {
-    //  _pagingController.error = error;
-    //}
   }
 
-  Future _loadFile() async {
-    final bytes = await readBytes(Uri.parse("kUrl1"));
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/DROELOE - Taking Flight.flac');
+  bool _hasTrack(int index) {
+    int page = (index ~/ _pageSize).toInt();
+    int pIndex = index % _pageSize;
 
-    await file.writeAsBytes(bytes);
-    if (file.existsSync()) {
-      setState(() => localFilePath = file.path);
-    }
+    if (!_pageMap.containsKey(page)) return false;
+    if (pIndex >= _pageMap[page]!.length) return false;
+
+    return true;
+  }
+
+  Track _fetchTrack(int index) {
+    int page = (index ~/ _pageSize).toInt();
+    int pIndex = index % _pageSize;
+    //print("main._fetchTrack: " + page.toString() + " " + _pageMap.length.toString());
+    return _pageMap[page]![pIndex];
   }
 
   void _select(Choice choice) {
@@ -212,14 +219,10 @@ class _CategoryRouteState extends State<CategoryRoute> {
     for (int i = 0; i < tracks.length; i++) {
       AppDatabase.insertTrack(tracks[i]);
     }
-
     final tracks2 = await AppDatabase.fetchTracks();
-
-    _pagingController.refresh();
 
     setState(() {
       _tracks = tracks2;
-      _pagingController.refresh();
     });
   }
 
@@ -231,35 +234,29 @@ class _CategoryRouteState extends State<CategoryRoute> {
     setState(() {
       _vs = ViewState.playlist;
       _playlists = playlists;
-      _pagingController.refresh();
     });
   }
 
   void loadPlaylist(Playlist playlist) async {
     if (playlist.id == "#ALL#") {
-      final tracks2 = await AppDatabase.fetchTracks();
-
+      _fetchPage(0);
+      int trackCount = await AppDatabase.fetchTracksCount();
+      print("main.loadPlaylist: " + trackCount.toString());
       setState(() {
+        _currentPlayList = playlist;
+        _trackCount = trackCount;
         _vs = ViewState.all;
-        _tracks = tracks2;
-        _pagingController.refresh();
       });
     } else {
       final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
-      final tracks2 = await AppDatabase.fetchPlaylistTracks(
-          tracksids); //fetchTracksByPlaylist
+      final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
 
       setState(() {
-        currentPlayList = playlist;
+        _currentPlayList = playlist;
         _vs = ViewState.playlist;
         _tracks = tracks2;
-        _pagingController.refresh();
       });
     }
-
-    //final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
-    //final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
-    //_pagingController.appendLastPage(tracks2);
   }
 
   @override
@@ -272,7 +269,6 @@ class _CategoryRouteState extends State<CategoryRoute> {
               //child: new Padding(
               //    padding: new EdgeInsets.only(top: MediaQuery.of(context).padding.top),
               child: Container(
-                  //height: MediaQuery.of(context).size.height,
                   child: new ListView.builder(
             //padding: new EdgeInsets.all(8.0),
             itemExtent: 40.0,
@@ -295,8 +291,12 @@ class _CategoryRouteState extends State<CategoryRoute> {
                       children: <Widget>[
                         new Expanded(
                             child: InkWell(
-                          child: Center(
-                            child: Text('By Song'),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('By Song'),
+                              Icon(Icons.arrow_drop_down)
+                            ],
                           ),
                           onTap: () {
                             sortOrder = 'name';
@@ -412,23 +412,27 @@ class _CategoryRouteState extends State<CategoryRoute> {
                     return new EntryItem(_tracks[index], index, this);
                   },
                 )
-              : PagedListView<int, Track>(
-                  pagingController: _pagingController,
-                  builderDelegate: PagedChildBuilderDelegate<Track>(
-                    itemBuilder: (context, item, index) =>
-                        EntryItem(item, index, this),
-                  ),
-                )
-
-          /*
-      new ListView.builder(
-        itemBuilder:  (BuildContext context, int index) {
-            return new EntryItem( _tracks[index] , index, this);}, // return sql query here? _tracks[index]  AppDatabase.fetchTrack(index)
-        itemCount: _tracks.length,//,
-      )
-      */
-          ,
+              : ListView.builder(
+                  itemCount: _trackCount,
+                  itemBuilder: (context, index) {
+                    if (_hasTrack(index)) {
+                      return new EntryItem(_fetchTrack(index), index, this);
+                    } else {
+                      //getMoreData(); // TODO
+                      _fetchPage((index ~/ _pageSize).toInt());
+                      return Center(child: CircularProgressIndicator());
+                    }
+                  }),
         ));
+  }
+
+  void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
+    _player.play(l, currentPlayList, index, _tracks);
+
+    this.setState(() {
+      this._currentTrack = index;
+      this._playingPlayList = currentPlayList;
+    });
   }
 }
 
@@ -482,8 +486,9 @@ class EntryItem extends StatelessWidget {
                                     print('tap2!');
                                     //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
                                     //crt.audioCache.playBytes(bytes);
-                                    crt._player.play(l, crt.currentPlayList,
-                                        index, crt._tracks);
+                                    //playingPlayList
+                                    crt.play(l, crt._currentPlayList, index,
+                                        crt._tracks);
                                   },
                                   child: Column(children: [
                                     Text(
@@ -500,10 +505,14 @@ class EntryItem extends StatelessWidget {
                           ])) //,
                         ]),
                     decoration: new BoxDecoration(
-                      color:
-                          index % 2 == 1 ? Colors.grey[200] : Colors.grey[50],
+                      color: (crt._currentTrack == index &&
+                              crt._playingPlayList.id ==
+                                  crt._currentPlayList.id)
+                          ? Colors.blue[300]
+                          : index % 2 == 1
+                              ? Colors.grey[200]
+                              : Colors.grey[50],
                     )),
-                //Text('<cmts> (<sub>)')
               ]))
         ]));
   }
@@ -526,7 +535,7 @@ class PlaylistButton extends StatelessWidget {
       onTap: () async {
         crState.loadPlaylist(playList);
         crState.refresh();
-        print(crState.currentPlayList);
+        //print(crState.currentPlayList);
       },
       child: new Container(
           //margin: EdgeInsets.,

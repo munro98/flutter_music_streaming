@@ -346,7 +346,7 @@ class Player {
     current_ind = index;
     _tracks = track;
 
-    print("Player.play:");
+    print("Player.play: " + t.name + ", " + t.oid.toString());
 
     if (Platform.isAndroid) {
       _permissionReady = await _checkPermission();

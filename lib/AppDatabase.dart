@@ -70,6 +70,16 @@ class AppDatabase {
     }
   }
 
+  static Future<int> fetchTracksCount() async {
+    try {
+      final Database db = await (database as Future<Database>);
+      final List<Map<String, dynamic>> maps =
+          await db.rawQuery('SELECT COUNT(*) FROM track');
+      return maps[0]["COUNT(*)"];
+    } catch (e) {}
+    return 0;
+  }
+
   static Future<List<Track>> fetchTracksPage(int _limit, int offset) async {
     try {
       print("AppDatabase: fetchTracksPage(int _limit, int offset)");
