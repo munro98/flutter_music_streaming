@@ -25,6 +25,8 @@ import 'Player.dart';
 /*
 todo
 
+play modes/sort order (song title/song title desc, artist/artist desc, date/date desc, playlist/playlist desc)
+highlight currently playing song
 shuffle playing
 looping
 store playlist data in local json files
@@ -35,16 +37,8 @@ download playlists
 
 add settings menu
 
-sort order by (song name/ artist/ date/ last played/ playcount)
-date_added
-artist name
-song name
-duration
-
 sync(play count/ last date played)
 delete (unchecked/ least played songs)
-
-
 
 artist view
 album view
