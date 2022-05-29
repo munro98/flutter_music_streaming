@@ -67,13 +67,16 @@ class CategoryRoute extends StatefulWidget {
 ReceivePort _port = ReceivePort();
 
 class _CategoryRouteState extends State<CategoryRoute> {
-  String? localFilePath;
+  //String? localFilePath;
+
+  final Playlist allPlayList = new Playlist("All Music", "#ALL#");
+  final Playlist favouritePlayList = new Playlist("Favourites", "#FAV#");
 
   List<Track> _tracks = <Track>[];
-  Playlist _currentPlayList = new Playlist("#ALL#", "#ALL#");
-  Playlist _playingPlayList = new Playlist("#ALL#", "#ALL#");
+  late Playlist _currentPlayList = allPlayList;
+  late Playlist _playingPlayList = allPlayList;
   Choice _selectedChoice = choices[0];
-  String sortOrder = 'playlist';
+  String _sortOrder = 'playlist';
 
   ViewState _vs = ViewState.all;
   List<Playlist> _playlists = [];
@@ -90,11 +93,14 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
   int _currentTrack = -1;
 
-  late String _localPath;
-  late bool _permissionReady;
-  List<_TaskInfo>? _tasks;
-  late List<_ItemHolder> _items;
-  late bool _isLoading;
+  GlobalKey<_MyStatefulWidgetState> _animationKey = GlobalKey();
+  ScrollController _scrollController = new ScrollController();
+
+  //late String _localPath;
+  //late bool _permissionReady;
+  //List<_TaskInfo>? _tasks;
+  //late List<_ItemHolder> _items;
+  //late bool _isLoading;
 
   @override
   void initState() {
@@ -122,16 +128,37 @@ class _CategoryRouteState extends State<CategoryRoute> {
         new Track("The end", "456", "audio.mp3", artist: "the backenders"));
 
     //AppDatabase.openConnection().then((value) => this.refresh());
+    //AppDatabase.openConnection();
+    AppDatabase.openConnection().then((value) => loadPlaylist(allPlayList));
 
-    AppDatabase.openConnection()
-        .then((value) => loadPlaylist(new Playlist("All", "#ALL#")));
-
-    _permissionReady = false;
-    _isLoading = true;
+    //_permissionReady = false;
+    //_isLoading = true;
     _player.init(_currentPlayList);
 
     fetchPlaylists2();
     loadPlaylist(_currentPlayList);
+
+    _animationKey.currentState?.stop();
+
+    /*
+    StreamBuilder(
+        stream: _player.assetsAudioPlayer.currentPosition,
+        builder: (context, asyncSnapshot) {
+          final bool isPlaying = asyncSnapshot.data as bool;
+          return Text(isPlaying ? 'Pause' : 'Play');
+        });
+    */
+
+    //_player.assetsAudioPlayer.
+
+    _player.assetsAudioPlayer.current.listen((playing) {
+      //final path = playing?.audio.path;
+      final songDuration = playing?.audio.duration;
+      //_animationKey.currentState?.setDurationValue(songDuration!);
+      _animationKey.currentState?.reset();
+
+      print("TTTTTTTTTTTTTTTTTTTT " + songDuration.toString());
+    });
 
     print(" initState" + _tracks.length.toString());
   }
@@ -171,7 +198,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
 
       _pageMapIsFetching[pageKey] = true;
 
-      var data = await AppDatabase.fetchTracksPage(_pageSize, pageKey);
+      var data =
+          await AppDatabase.fetchTracksPage(_pageSize, pageKey, _sortOrder);
 
       print("main._fetchPage: GOT PAGE DATA: " + pageKey.toString());
 
@@ -214,7 +242,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
   }
 
   void refresh() async {
-    final tracks = await Api.fetchTracks("track", sortOrder);
+    final tracks = await Api.fetchTracks("track", _sortOrder);
 
     for (int i = 0; i < tracks.length; i++) {
       AppDatabase.insertTrack(tracks[i]);
@@ -227,9 +255,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
   }
 
   void refreshPlaylists() async {
-    List<Playlist> playlists = await Api.fetchPlaylists("track", sortOrder);
+    List<Playlist> playlists = await Api.fetchPlaylists("track", _sortOrder);
 
-    playlists.insert(0, new Playlist("All Music", "#ALL#"));
+    playlists.insert(0, allPlayList);
 
     setState(() {
       _vs = ViewState.playlist;
@@ -242,11 +270,17 @@ class _CategoryRouteState extends State<CategoryRoute> {
       _fetchPage(0);
       int trackCount = await AppDatabase.fetchTracksCount();
       print("main.loadPlaylist: " + trackCount.toString());
+
       setState(() {
+        //_pageMap.clear(); // TODO: is this needed?
+        //_pageMapCount = 0;
+        //_pageMapIsFetching.clear();
         _currentPlayList = playlist;
         _trackCount = trackCount;
         _vs = ViewState.all;
       });
+
+      _pageMap.forEach((k, v) => {_fetchPage(k)});
     } else {
       final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
       final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
@@ -299,8 +333,9 @@ class _CategoryRouteState extends State<CategoryRoute> {
                             ],
                           ),
                           onTap: () {
-                            sortOrder = 'name';
-                            refresh();
+                            _sortOrder = 'name';
+                            loadPlaylist(_currentPlayList);
+                            //refresh();
                           },
                         )),
                         new Expanded(
@@ -309,8 +344,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
                             child: Text('Artist'),
                           ),
                           onTap: () {
-                            sortOrder = 'artist';
-                            refresh();
+                            _sortOrder = 'artist';
+                            loadPlaylist(_currentPlayList);
                           },
                         )),
                         new Expanded(
@@ -319,8 +354,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
                                   child: Text('Date'),
                                 ),
                                 onTap: () {
-                                  sortOrder = 'added_date';
-                                  refresh();
+                                  _sortOrder = 'added_date';
+                                  loadPlaylist(_currentPlayList);
                                 })),
                         new Expanded(
                             child: InkWell(
@@ -328,8 +363,8 @@ class _CategoryRouteState extends State<CategoryRoute> {
                                   child: Text('Playlist'),
                                 ),
                                 onTap: () {
-                                  sortOrder = 'playlist';
-                                  refresh();
+                                  _sortOrder = 'playlist';
+                                  loadPlaylist(_currentPlayList);
                                 })),
                       ],
                     ),
@@ -363,7 +398,7 @@ class _CategoryRouteState extends State<CategoryRoute> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    MyStatefulWidget(this),
+                    MyStatefulWidget(this, key: _animationKey),
                     Padding(
                         padding: const EdgeInsets.fromLTRB(6.0, 0.0, 6.0, 6.0),
                         child: Row(
@@ -434,6 +469,19 @@ class _CategoryRouteState extends State<CategoryRoute> {
       this._playingPlayList = currentPlayList;
     });
   }
+}
+
+/// Helper class that makes the relationship between
+/// an item index and its BuildContext
+///
+class ItemContext {
+  final BuildContext context;
+  final int id;
+
+  ItemContext({required this.context, required this.id});
+
+  @override
+  bool operator ==(Object other) => other is ItemContext && other.id == id;
 }
 
 // Displays one Entry. If the entry has children then it's displayed
@@ -595,15 +643,37 @@ class _MyStatefulWidgetState extends State<MyStatefulWidget>
 
   _MyStatefulWidgetState(this.crt);
 
+  void reset() {
+    controller.reset();
+  }
+
+  void stop() {
+    controller.stop();
+  }
+
+  void setProgressValue(double val) {
+    this.setState(() {
+      controller.value = val;
+    });
+  }
+
+  void setDurationValue(Duration duration) {
+    this.setState(() {
+      controller.duration = duration;
+    });
+  }
+
   @override
   void initState() {
     controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 5),
+      duration: const Duration(seconds: 120),
     )..addListener(() {
         setState(() {});
       });
-    //controller.repeat(reverse: true);
+    //controller.
+    controller.repeat(reverse: false);
+    //controller.
     super.initState();
   }
 
@@ -622,8 +692,8 @@ class _MyStatefulWidgetState extends State<MyStatefulWidget>
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           LinearProgressIndicator(
-            value:
-                0.0, //crt._player.assetsAudioPlayer.currentPosition.inSeconds.toDouble() / crt._player.assetsAudioPlayer.duration.inSeconds.toDouble()
+            value: controller
+                .value, //crt._player.assetsAudioPlayer.currentPosition.inSeconds.toDouble() / crt._player.assetsAudioPlayer.duration.inSeconds.toDouble()
             semanticsLabel: 'Linear progress indicator',
           ),
         ],

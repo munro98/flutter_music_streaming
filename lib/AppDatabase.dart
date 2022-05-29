@@ -80,7 +80,8 @@ class AppDatabase {
     return 0;
   }
 
-  static Future<List<Track>> fetchTracksPage(int _limit, int offset) async {
+  static Future<List<Track>> fetchTracksPage(
+      int _limit, int offset, String sortOrder) async {
     try {
       print("AppDatabase: fetchTracksPage(int _limit, int offset)");
       // Get a reference to the database.
@@ -90,50 +91,53 @@ class AppDatabase {
       //final List<Map<String, dynamic>> maps = await db.query('track', where: 'rowid > ?', whereArgs: [id],
       //orderBy: 'rowid', limit: _limit);
       //final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE rowid NOT IN ( SELECT rowid FROM track ORDER BY rowid ASC LIMIT 50 ) ORDER BY rowid ASC LIMIT 10');
+      final List<Map<String, dynamic>> maps;
 
-      /*
+      ///*
       // https://gist.github.com/ssokolow/262503\
-      //if (sortOrder == "playlist") {
-      final List<Map<String, dynamic>> maps = await db.rawQuery(
-          'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
-              offset.toString() +
-              ' )ORDER BY oid ASC LIMIT ' +
-              _limit.toString());
-      // else if (sortOrder == "playlistdesc") {
-      final List<Map<String, dynamic>> maps = await db.rawQuery(
-          'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
-              offset.toString() +
-              ' )ORDER BY oid DESC LIMIT ' +
-              _limit.toString());
-      */
-      final List<Map<String, dynamic>> maps = await db.rawQuery(
-          'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
-              offset.toString() +
-              ' )ORDER BY name ASC LIMIT ' +
-              _limit.toString());
-      /*
-      else if (sortOrder == "namedesc") {
-      final List<Map<String, dynamic>> maps = await db.rawQuery(
-          'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
-              offset.toString() +
-              ' )ORDER BY name DESC LIMIT ' +
-              _limit.toString());
+      if (sortOrder == "playlist") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid ASC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "playlistdesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid DESC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "name") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY name ASC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "namedesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY name DESC LIMIT ' +
+                _limit.toString());
       } else if (sortOrder == "artist") {
-      final List<Map<String, dynamic>> maps = await db.rawQuery(
-          'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
-              offset.toString() +
-              ' )ORDER BY artist ASC, name ASC LIMIT ' +
-              _limit.toString());
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY artist ASC, name ASC LIMIT ' +
+                _limit.toString());
       } else if (sortOrder == "artistdesc") {
-      final List<Map<String, dynamic>> maps = await db.rawQuery(
-          'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
-              offset.toString() +
-              ' )ORDER BY artist DESC, name DESC LIMIT ' +
-              _limit.toString());
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY artist DESC, name DESC LIMIT ' +
+                _limit.toString());
+      } else {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid ASC LIMIT ' +
+                _limit.toString());
       }
-
-
-      */
 
       List<Track> tracks = List.generate(maps.length, (i) {
         return Track(
