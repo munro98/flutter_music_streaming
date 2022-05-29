@@ -23,6 +23,7 @@ import 'API.dart';
 import 'Playlist.dart';
 
 import 'Playlist.dart';
+import 'CategoryRoute.dart';
 
 enum PlayContext { all, playlist }
 
@@ -33,7 +34,11 @@ const String STREAM_URL = "http://192.168.0.105:3000/api/track/";
 class Player {
   static int THREASH = 512;
 
-  Player();
+  Player(CategoryRouteState crt) {
+    this.crt = crt;
+  }
+
+  late CategoryRouteState crt;
 
   AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
 
@@ -60,10 +65,6 @@ class Player {
 
   bool ignoreStop = false;
 
-  //bool isLargePlaylist = false;
-  //DoubleLinkedQueue < int > queue; // 128 max length
-  //Set < int > set;
-
   void init(Playlist playlist) {
     currentPlaylist = playlist;
 
@@ -75,7 +76,7 @@ class Player {
       } else if (assetsAudioPlayer.playerState.value == PlayerState.stop) {
         print("Player: music finished stopped");
         if (!ignoreStop) {
-          skip_next();
+          skipNext();
         }
       }
 
@@ -318,11 +319,10 @@ class Player {
     if (_permissionReady) {
       var saveDir = await prepTrackDir(track);
 
-      var file_path =
-          path_lib.join(saveDir, path_lib.basename(track.file_path));
-      print("downloading to: " + file_path);
+      var filePath = path_lib.join(saveDir, path_lib.basename(track.file_path));
+      print("downloading to: " + filePath);
 
-      var checkDuplicate = File(file_path);
+      var checkDuplicate = File(filePath);
 
       if (checkDuplicate.existsSync()) {
         //do nothing
@@ -420,13 +420,13 @@ class Player {
     } else if (Platform.isWindows) {}
   }
 
-  void play_pause() {
+  void playPause() {
     if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       assetsAudioPlayer.playOrPause();
     } else if (Platform.isWindows) {}
   }
 
-  void skip_next() async {
+  void skipNext() async {
     print('Player: skip_next()!');
 
     if (Platform.isAndroid) {
@@ -434,7 +434,8 @@ class Player {
       try {
         Track t = await getNextTrack();
 
-        print('Player: skip_next()! ' + t.file_path);
+        print('Player.skip_next: ' + t.file_path);
+        crt.setCurrentTrack(t);
         play(t, currentPlaylist, current_ind, _tracks);
 
         /*
@@ -446,7 +447,7 @@ class Player {
         }
         */
       } catch (e) {
-        print('Player.skip_next: error');
+        print('Player.skip_next: error' + e.toString());
       }
     } else if (Platform.isIOS) {
     } else if (Platform.isWindows || Platform.isMacOS) {}
