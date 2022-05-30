@@ -32,7 +32,7 @@ enum LoopMode { none, one, all }
 const String STREAM_URL = "http://192.168.0.105:3000/api/track/";
 
 class Player {
-  static int THREASH = 512;
+  static int maxShufflePlayed = 16;
 
   Player(CategoryRouteState crt) {
     this.crt = crt;
@@ -53,6 +53,9 @@ class Player {
 
   List<Track> _tracks = [];
   List<Track> shuffle_tracks = [];
+
+  Queue<String> _shufflePlayed = new Queue();
+  int _trackCount = 0;
 
   ReceivePort _port = ReceivePort();
   late String _localPath;
@@ -180,45 +183,46 @@ class Player {
     }
   }
 
-  /* Shuffle algo
-
-  if (all) {
-
-    if (select * from tracks where enabled = TRUE.count < 512) {
-      shufflePlaylist = select * from tracks where enabled = TRUE.count
-      shufflePlaylist.shuffle
-    } else {
-      count = select * from tracks where enabled = TRUE.count
-      next track = select top 1 from tracks where enabled = TRUE ORDER BY NEWID()
-
-      //WHERE num_value >= RAND() * (SELECT MAX(num_value) FROM table) // use FLOOR(RAND()*max_val)
-      //select top 1 from tracks WHERE num_value >= FLOOR(RAND() * (SELECT MAX(num_value) FROM table))
+  void addToShuffleHistory(Track t) {
+    if (t.oid != null) {
+      _shufflePlayed.addLast(t.oid!);
+      while (_shufflePlayed.length > maxShufflePlayed) {
+        _shufflePlayed.removeFirst();
+      }
+      if (_shufflePlayed.length >= _trackCount) {
+        _shufflePlayed = new Queue();
+      }
     }
-
   }
-  if (playlist) {
-
-    shufflePlaylist = playlist.shuffle
-
-  }
-  
-  
-  */
 
   Future<Track> getNextTrack() async {
     if (current != null) {
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
-        Track c = current as Track;
-        print(
-            "________________________________________________________________________oid " +
-                currentPlaylist!.id);
-        print(
-            "________________________________________________________________________oid " +
-                c.oid.toString());
+        if (!isShuffle) {
+          Track c = current as Track;
+          print(
+              "________________________________________________________________________oid " +
+                  currentPlaylist!.id);
+          print(
+              "________________________________________________________________________oid " +
+                  c.oid.toString());
 
-        Track next = await AppDatabase.fetchNextTrack(c.oid as String, "");
-        print("________________________________________" + next.name);
-        return next;
+          Track next = await AppDatabase.fetchNextTrack(
+              c.oid as String, crt.getSortOrder());
+          print("________________________________________" + next.name);
+          return next;
+        } else {
+          Track c = current as Track;
+
+          addToShuffleHistory(c);
+          print("Player.getNextTrack: shuffle len " +
+              _shufflePlayed.length.toString());
+
+          Track next = await AppDatabase.fetchNextTrackShuffle(
+              c.oid as String, _shufflePlayed);
+          print("________________________________________" + next.name);
+          return next;
+        }
       } else {
         if (isShuffle) {
           //if (!isLargePlaylist) {
@@ -277,9 +281,21 @@ class Player {
   Future<Track> getPrevTrack() async {
     if (current != null) {
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
-        if (current != null) {
+        if (!isShuffle) {
+          if (current != null) {
+            Track c = current as Track;
+            Track next = await AppDatabase.fetchPrevTrack(
+                c.oid as String, crt.getSortOrder());
+            return next;
+          }
+        } else {
           Track c = current as Track;
-          Track next = await AppDatabase.fetchPrevTrack(c.oid as String, "");
+
+          addToShuffleHistory(c);
+
+          Track next = await AppDatabase.fetchNextTrackShuffle(
+              c.oid as String, _shufflePlayed);
+          print("________________________________________" + next.name);
           return next;
         }
       } else {
@@ -340,11 +356,16 @@ class Player {
     }
   }
 
-  void play(Track t, Playlist? p, int index, List<Track> track) async {
+  void play(Track t, Playlist? p, int index, List<Track> track,
+      int trackCount) async {
+    if (p!.id != currentPlaylist?.id) {
+      _shufflePlayed = new Queue();
+    }
     current = t;
     currentPlaylist = p;
     current_ind = index;
     _tracks = track;
+    _trackCount = trackCount;
 
     print("Player.play: " + t.name + ", " + t.oid.toString());
 
@@ -427,25 +448,21 @@ class Player {
   }
 
   void skipNext() async {
-    print('Player: skip_next()!');
+    /*
+    if (isShuffle) {
+      skipShuffle();
+      return;
+    }
+    */
 
+    print('Player.skipNext:');
     if (Platform.isAndroid) {
-      //assetsAudioPlayer.stop();
       try {
         Track t = await getNextTrack();
 
         print('Player.skip_next: ' + t.file_path);
         crt.setCurrentTrack(t);
-        play(t, currentPlaylist, current_ind, _tracks);
-
-        /*
-        await assetsAudioPlayer.open(Audio.network(STREAM_URL + t.id));
-        if (current != null) {
-          await assetsAudioPlayer.open(
-            //Audio.network("http://192.168.0.105:3000/api/track/"+ (current?.id as String))
-        );
-        }
-        */
+        play(t, currentPlaylist, current_ind, _tracks, _trackCount);
       } catch (e) {
         print('Player.skip_next: error' + e.toString());
       }
@@ -453,16 +470,26 @@ class Player {
     } else if (Platform.isWindows || Platform.isMacOS) {}
   }
 
-  void skip_prev() async {
+  void skipPrev() async {
+    /*
+    if (isShuffle) {
+      skipShuffle();
+      return;
+    }
+    */
+
+    print('Player.skipPrev:');
     if (Platform.isAndroid) {
-      //assetsAudioPlayer.stop();
       try {
         Track t = await getPrevTrack();
-        play(t, currentPlaylist, current_ind, _tracks);
-        //await assetsAudioPlayer.open(Audio.network(STREAM_URL + t.id));
-
+        crt.setCurrentTrack(t);
+        play(t, currentPlaylist, current_ind, _tracks, _trackCount);
       } catch (e) {}
     } else if (Platform.isIOS) {
     } else if (Platform.isWindows || Platform.isMacOS) {}
+  }
+
+  void setShuffleMode(bool shuffleMode) {
+    isShuffle = shuffleMode;
   }
 }

@@ -4,15 +4,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
-//import 'package:provider/provider.dart';
-import 'package:http/http.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart';
 
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path/path.dart' as path_lib;
+
 import 'dart:isolate';
 import 'dart:ui';
 
@@ -26,10 +27,14 @@ import 'SeekBar.dart';
 /*
 todo
 
-play modes/sort order (song title/song title desc, artist/artist desc, date/date desc, playlist/playlist desc)
-shuffle playing
-looping
+
 store playlist data in local json files
+implement favourites playlist
+
+fix added_date sort order
+add album sortOrder
+improve shuffle playing/ implement for playlists
+looping
 
 detect when track can't be played due to end of playlist/missing connection to server/other reason
 
@@ -42,6 +47,8 @@ add settings menu
 
 sync(play count/ last date played)
 delete (unchecked/ least played songs)
+
+## stretch goal ##
 
 artist view
 album view
@@ -95,6 +102,7 @@ class CategoryRouteState extends State<CategoryRoute> {
   int _trackCount = 0;
 
   String _currentTrack = "";
+  bool _shuffleMode = false;
 
   GlobalKey<SeekBarState> _animationKey = GlobalKey();
 
@@ -136,8 +144,6 @@ class CategoryRouteState extends State<CategoryRoute> {
     _tracks.add(new Track("Happy Endings", "456",
         "Mike Shinoda - Happy Endings (feat. iann dior and UPSAHL).flac",
         artist: "Mike Shinoda"));
-    _tracks.add(
-        new Track("The end", "456", "audio.mp3", artist: "the backenders"));
 
     //AppDatabase.openConnection().then((value) => this.refresh());
     //AppDatabase.openConnection();
@@ -321,6 +327,7 @@ class CategoryRouteState extends State<CategoryRoute> {
     List<Playlist> playlists = await Api.fetchPlaylists("track", _sortOrder);
 
     playlists.insert(0, allPlayList);
+    playlists.insert(1, favouritePlayList);
 
     setState(() {
       _vs = PlayContext.playlist;
@@ -393,7 +400,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('By Song'),
+                                Text('Title'),
                                 Icon(Icons.arrow_drop_down)
                               ],
                             ),
@@ -472,14 +479,26 @@ class CategoryRouteState extends State<CategoryRoute> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 new IconButton(
-                                  icon: new Icon(Icons.shuffle),
-                                  onPressed: () {},
+                                  icon: new Icon(Icons.shuffle,
+                                      color: _shuffleMode
+                                          ? Colors.blue[400]
+                                          : Colors.black),
+                                  onPressed: () {
+                                    this.setState(() {
+                                      _shuffleMode = !_shuffleMode;
+                                    });
+                                    HapticFeedback.lightImpact();
+                                    print(
+                                        "shuffle: " + _shuffleMode.toString());
+                                    _player.setShuffleMode(_shuffleMode);
+                                  },
                                 ),
                                 new IconButton(
                                   iconSize: 40,
                                   icon: new Icon(Icons.skip_previous),
                                   onPressed: () {
-                                    _player.skip_prev();
+                                    _player.skipPrev();
+                                    HapticFeedback.lightImpact();
                                   },
                                 ),
                                 new IconButton(
@@ -487,6 +506,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                                   icon: new Icon(Icons.play_arrow),
                                   onPressed: () {
                                     _player.playOrPause();
+                                    HapticFeedback.lightImpact();
                                   },
                                 ),
                                 new IconButton(
@@ -494,11 +514,14 @@ class CategoryRouteState extends State<CategoryRoute> {
                                   icon: new Icon(Icons.skip_next),
                                   onPressed: () {
                                     _player.skipNext();
+                                    HapticFeedback.lightImpact();
                                   },
                                 ),
                                 new IconButton(
                                   icon: new Icon(Icons.loop),
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    //HapticFeedback.lightImpact();
+                                  },
                                 ),
                               ]))
                     ]),
@@ -510,7 +533,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                 ? ListView.builder(
                     itemCount: _tracks.length,
                     itemBuilder: (BuildContext context, int index) {
-                      return new EntryItem(_tracks[index], index, this);
+                      return new TrackItem(_tracks[index], index, this);
                     },
                   )
                 : NotificationListener<ScrollUpdateNotification>(
@@ -527,7 +550,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                         itemCount: _trackCount,
                         itemBuilder: (context, index) {
                           if (_hasTrack(index)) {
-                            return new EntryItem(
+                            return new TrackItem(
                                 _fetchTrack(index), index, this);
                           } else {
                             //getMoreData(); // TODO
@@ -539,7 +562,7 @@ class CategoryRouteState extends State<CategoryRoute> {
   }
 
   void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
-    _player.play(l, currentPlayList, index, _tracks);
+    _player.play(l, currentPlayList, index, _tracks, _trackCount);
 
     this.setState(() {
       this._currentTrack = l.oid!;
@@ -551,6 +574,10 @@ class CategoryRouteState extends State<CategoryRoute> {
     this.setState(() {
       this._currentTrack = t.oid!;
     });
+  }
+
+  String getSortOrder() {
+    return this._sortOrder;
   }
 }
 
@@ -569,8 +596,8 @@ class ItemContext {
 
 // Displays one Entry. If the entry has children then it's displayed
 // with an ExpansionTile.
-class EntryItem extends StatelessWidget {
-  const EntryItem(this.l, this.index, this.crt);
+class TrackItem extends StatelessWidget {
+  const TrackItem(this.l, this.index, this.crt);
 
   final Track l;
   final CategoryRouteState crt;

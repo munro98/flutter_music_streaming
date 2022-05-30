@@ -111,8 +111,8 @@ class Apiabc {
 
       //DateTime.parse(d['release_date'])
 
-      Track track =
-          new Track(d['name'], d['_id'], d['file_path'], artist: d['artist']);
+      Track track = new Track(d['name'], d['_id'], d['file_path'],
+          artist: d['artist'], added_date: d['added_date']);
       //
 
       tracks.add(track);
