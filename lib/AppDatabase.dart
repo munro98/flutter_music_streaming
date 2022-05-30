@@ -82,7 +82,7 @@ class AppDatabase {
     return 0;
   }
 
-  static Future<int> fetchTracksCountFavourites() async {
+  static Future<int> fetchTracksCountFav() async {
     try {
       final Database db = await (database as Future<Database>);
       final List<Map<String, dynamic>> maps =
@@ -456,8 +456,406 @@ class AppDatabase {
     return t;
   }
 
+  //Favourites Code
+  //////////////////////////////////////////////////////////////////////////////
+
+  static Future<List<Track>> fetchTracksPageFav(
+      int _limit, int offset, String sortOrder) async {
+    try {
+      print("AppDatabase.fetchTracksPage:");
+      // Get a reference to the database.
+      final Database db = await (database as Future<Database>);
+
+      // Query the table
+      //final List<Map<String, dynamic>> maps = await db.query('track', where: 'rowid > ?', whereArgs: [id],
+      //orderBy: 'rowid', limit: _limit);
+      //final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE rowid NOT IN ( SELECT rowid FROM track ORDER BY rowid ASC LIMIT 50 ) ORDER BY rowid ASC LIMIT 10');
+      final List<Map<String, dynamic>> maps;
+
+      ///*
+      // https://gist.github.com/ssokolow/262503\
+      if (sortOrder == "playlist") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track WHERE is_active = 1 ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid ASC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "playlistdesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track WHERE is_active = 1 ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid DESC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "name") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track WHERE is_active = 1 ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY name ASC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "namedesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track WHERE is_active = 1 ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY name DESC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "artist") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track WHERE is_active = 1 ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY artist ASC, name ASC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == "artistdesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track WHERE is_active = 1 ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY artist DESC, name DESC LIMIT ' +
+                _limit.toString());
+      } else {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track WHERE is_active = 1 ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid ASC LIMIT ' +
+                _limit.toString());
+      }
+
+      List<Track> tracks = List.generate(maps.length, (i) {
+        return Track(
+          maps[i]['name'],
+          maps[i]['id'],
+          maps[i]['file_path'],
+          artist: maps[i]['artist'],
+          oid: maps[i]['oid'].toString(),
+        );
+      });
+
+      print("fetching tracks " + tracks.length.toString());
+
+      for (int i = 0; i < tracks.length; i++) {
+        // WHAT: HOW DOES THIS EVEN WORK!!!!????
+        tracks[i].oid = maps[i]['oid'].toString();
+
+        if (maps[i]['added_date'] != null) {
+          tracks[i].added_date = maps[i]['added_date'];
+        }
+      }
+      //print("fetching trackssdfgasdgd " + maps[0]['oid'].toString());
+      //print("fetching trackssdfgasdgd " + tracks[0].oid.toString());
+
+      return tracks;
+    } catch (e) {
+      print(
+          "AppDatabase.fetchTracksPage:fetching tracks error " + e.toString());
+      return [];
+    }
+  }
+
+  static Future<Track> fetchNextTrackFav(String id, String sortOrder) async {
+    print("fetching track " + id);
+    // Get a reference to the database.
+    final Database db = await (database as Future<Database>);
+
+    //sortOrder == "playlist"
+    //final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT rowid as oid, * FROM track WHERE oid > '+ id + ' ORDER BY oid ASC LIMIT ' + '1');
+
+    try {
+      // get name of current track
+      final List<Map<String, dynamic>> maps1 = await db
+          .rawQuery('SELECT rowid as oid, * FROM track WHERE oid = ' + id);
+
+      String findName = maps1[0]['name'];
+      String findArtist = maps1[0]['artist'];
+      //String findDate = maps1[0]['added_date'];
+      int findId = maps1[0]['oid'];
+
+      final List<Map<String, dynamic>> maps;
+
+      // get first track with same name if index is after current track or name > current track
+      if (sortOrder == "playlist") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND oid > ' +
+                id +
+                ' ORDER BY oid ASC LIMIT ' +
+                '1');
+      } else if (sortOrder == "playlistdesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND oid < ' +
+                id +
+                ' ORDER BY oid DESC LIMIT ' +
+                '1');
+      } else if (sortOrder == "name") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+                '(name LIKE \'' +
+                findName +
+                '\' and oid > ' +
+                findId.toString() +
+                ' ) or (name > \'' +
+                findName +
+                '\' ) ORDER BY name ASC LIMIT ' +
+                '1');
+      } else if (sortOrder == "namedesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+                '(name LIKE \'' +
+                findName +
+                '\' and oid < ' +
+                findId.toString() +
+                ' ) or (name < \'' +
+                findName +
+                '\' ) ORDER BY name DESC LIMIT ' +
+                '1');
+      } else if (sortOrder == "artist") {
+        // TODO: handle 2 artists next to each other with same song name
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+                '(artist LIKE \'' +
+                findArtist +
+                '\' and name > \'' +
+                findName +
+                //'\' and oid > ' +
+                //findId.toString() +
+                '\' ) or (artist > \'' +
+                findArtist +
+                '\' ) ORDER BY artist ASC, name ASC LIMIT ' +
+                '1');
+      } else if (sortOrder == "artistdesc") {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+                '(artist LIKE \'' +
+                findArtist +
+                '\' and name < \'' +
+                findName +
+                //'\' and oid > ' +
+                //findId.toString() +
+                '\' ) or (artist < \'' +
+                findArtist +
+                '\' ) ORDER BY artist DESC, name DESC LIMIT ' +
+                '1');
+      }
+      /*else if (sortOrder == "date") {
+        maps = await db.rawQuery('SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+            '(added_date = \'' +
+            findDate +
+            '\' and oid > ' +
+            findId.toString() +
+            ' ) or (added_date > \'' +
+            findDate +
+            '\' ) ORDER BY added_date ASC LIMIT ' +
+            '1');
+      } else if (sortOrder == "datedesc") {
+        maps = await db.rawQuery('SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+            '(added_date = \'' +
+            findDate +
+            '\' and oid < ' +
+            findId.toString() +
+            ' ) or (added_date < \'' +
+            findDate +
+            '\' ) ORDER BY added_date DESC LIMIT ' +
+            '1');
+      } */
+      else {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND oid > ' +
+                id +
+                ' ORDER BY oid ASC LIMIT ' +
+                '1');
+      }
+
+      Track t = Track(
+        maps[0]['name'],
+        maps[0]['id'],
+        maps[0]['file_path'],
+        artist: maps[0]['artist'],
+        oid: maps[0]['oid'].toString(),
+      );
+      t.oid = maps[0]['oid'].toString();
+      //if (maps[0]['added_date'] != null) {
+      //t.added_date = maps[0]['added_date'];
+      //}
+      //*/
+      //return Track("", "", "");
+      return t;
+    } catch (e) {
+      print("fetching tracks error " + e.toString());
+    }
+    return Track("", "", "");
+  }
+
+  static Future<Track> fetchPrevTrackFav(String id, String sortOrder) async {
+    print("APPDB: fetchPrevTrack");
+    // Get a reference to the database.
+    final Database db = await (database as Future<Database>);
+
+    /*
+    final List<Map<String, dynamic>> maps = await db.rawQuery(
+        'SELECT rowid as oid, * FROM track WHERE oid < ' +
+            id +
+            ' ORDER BY oid DESC LIMIT ' +
+            '1');
+    */
+    // get name of current track
+    final List<Map<String, dynamic>> maps1 = await db
+        .rawQuery('SELECT rowid as oid, * FROM track WHERE oid = ' + id);
+
+    String findName = maps1[0]['name'];
+    String findArtist = maps1[0]['artist'];
+    int findId = maps1[0]['oid'];
+
+    final List<Map<String, dynamic>> maps;
+
+    // get first track with same name if index is after current track or name > current track
+    if (sortOrder == "playlist") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND oid < ' +
+              id +
+              ' ORDER BY oid DESC LIMIT ' +
+              '1');
+    } else if (sortOrder == "playlistdesc") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND oid > ' +
+              id +
+              ' ORDER BY oid ASC LIMIT ' +
+              '1');
+    } else if (sortOrder == "name") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+              '(name LIKE \'' +
+              findName +
+              '\' and oid < ' +
+              findId.toString() +
+              ' ) or (name < \'' +
+              findName +
+              '\' ) ORDER BY name DESC LIMIT ' +
+              '1');
+    } else if (sortOrder == "namedesc") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+              '(name LIKE \'' +
+              findName +
+              '\' and oid > ' +
+              findId.toString() +
+              ' ) or (name > \'' +
+              findName +
+              '\' ) ORDER BY name ASC LIMIT ' +
+              '1');
+    } else if (sortOrder == "artist") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+              '(artist LIKE \'' +
+              findArtist +
+              '\' and name < \'' +
+              findName +
+              //'\' and oid > ' +
+              //findId.toString() +
+              '\' ) or (artist < \'' +
+              findArtist +
+              '\' ) ORDER BY artist DESC, name DESC LIMIT ' +
+              '1');
+    } else if (sortOrder == "artistdesc") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+              '(artist LIKE \'' +
+              findArtist +
+              '\' and name > \'' +
+              findName +
+              //'\' and oid > ' +
+              //findId.toString() +
+              '\' ) or (artist > \'' +
+              findArtist +
+              '\' ) ORDER BY artist ASC, name ASC LIMIT ' +
+              '1');
+    } /*else if (sortOrder == "date") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+              '(name LIKE \'' +
+              findName +
+              '\' and oid > ' +
+              findId.toString() +
+              ' ) or (artist > \'' +
+              findName +
+              '\' ) ORDER BY added_date ASC LIMIT ' +
+              '1');
+    } else if (sortOrder == "datedesc") {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND ' +
+              '(name LIKE \'' +
+              findName +
+              '\' and oid > ' +
+              findId.toString() +
+              ' ) or (artist > \'' +
+              findName +
+              '\' ) ORDER BY added_date DESC LIMIT ' +
+              '1');
+    }*/
+    else {
+      maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE is_active = 1 AND oid < ' +
+              id +
+              ' ORDER BY oid DESC LIMIT ' +
+              '1');
+    }
+
+    Track t = Track(
+      maps[0]['name'],
+      maps[0]['id'],
+      maps[0]['file_path'],
+      artist: maps[0]['artist'],
+      oid: maps[0]['oid'].toString(),
+    );
+    t.oid = maps[0]['oid'].toString();
+    if (maps[0]['added_date'] != null) {
+      t.added_date = maps[0]['added_date'];
+    }
+
+    return t;
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+
   //TODO: Test this
   static Future<Track> fetchNextTrackShuffle(
+      String id, Queue<String> lastPlayed) async {
+    print("fetching track " + id);
+    // Get a reference to the database.
+    final Database db = await (database as Future<Database>);
+
+    String s = '';
+    lastPlayed.forEach((element) => {s += element.toString() + ', '});
+
+    if (s.isNotEmpty) {
+      s = s.substring(0, s.length - 1 - 1);
+    }
+
+    print("AppDatabase.fetchNextTrackShuffle: shuffle history " + s);
+
+    try {
+      final List<Map<String, dynamic>> maps = await db.rawQuery(
+          'SELECT rowid as oid, * FROM track WHERE oid not in (' +
+              s +
+              ') ORDER BY RANDOM() LIMIT ' +
+              '1');
+
+      Track t = Track(
+        maps[0]['name'],
+        maps[0]['id'],
+        maps[0]['file_path'],
+        artist: maps[0]['artist'],
+        oid: maps[0]['oid'].toString(),
+      );
+      t.oid = maps[0]['oid'].toString();
+      if (maps[0]['added_date'] != null) {
+        t.added_date = maps[0]['added_date'];
+      }
+      //*/
+      //return Track("", "", "");
+      return t;
+    } catch (e) {
+      print("fetching tracks error " + e.toString());
+    }
+    return Track("", "", "");
+  }
+
+  static Future<Track> fetchNextTrackShuffleFav(
       String id, Queue<String> lastPlayed) async {
     print("fetching track " + id);
     // Get a reference to the database.

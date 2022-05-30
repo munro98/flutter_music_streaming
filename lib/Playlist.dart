@@ -10,7 +10,7 @@ import 'Track.dart';
 class Playlist {
   Playlist(String this.name, String this.id);
 
-  //bool downloaded
+  //String sort_order; Title/Artist/Album/Playlist
   String name;
   String id;
 

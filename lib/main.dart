@@ -47,21 +47,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-class _TaskInfo {
-  final String? name;
-  final String? link;
-
-  String? taskId;
-  int? progress = 0;
-  DownloadTaskStatus? status = DownloadTaskStatus.undefined;
-
-  _TaskInfo({this.name, this.link});
-}
-
-class _ItemHolder {
-  final String? name;
-  final _TaskInfo? task;
-
-  _ItemHolder({this.name, this.task});
-}

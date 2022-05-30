@@ -27,9 +27,7 @@ import 'SeekBar.dart';
 /*
 todo
 
-
 store playlist data in local json files
-implement favourites playlist
 
 fix added_date sort order
 add album sortOrder
@@ -147,14 +145,15 @@ class CategoryRouteState extends State<CategoryRoute> {
 
     //AppDatabase.openConnection().then((value) => this.refresh());
     //AppDatabase.openConnection();
-    AppDatabase.openConnection().then((value) => loadPlaylist(allPlayList));
+    AppDatabase.openConnection()
+        .then((value) => loadPlaylist(_currentPlayList, "playlist"));
 
     //_permissionReady = false;
     //_isLoading = true;
     _player.init(_currentPlayList);
 
-    fetchPlaylists2();
-    loadPlaylist(_currentPlayList);
+    fetchPlaylists();
+    loadPlaylist(_currentPlayList, "playlist");
 
     _animationKey.currentState?.stop();
 
@@ -245,30 +244,37 @@ class CategoryRouteState extends State<CategoryRoute> {
     send.send([id, status, progress]);
   }
 
-  fetchPlaylists2() async {
+  fetchPlaylists() async {
     //print(" fetchPlaylists" + _playlists.length.toString());
     try {
       List<Playlist> playlists = await Api.fetchPlaylists("", "");
-      playlists.add(new Playlist("All Music", "#ALL#"));
+      playlists.insert(0, allPlayList);
+      playlists.insert(1, favouritePlayList);
 
       setState(() {
         _playlists = playlists;
         _vs = PlayContext.playlist;
       });
     } catch (e) {
-      print("main.fetchPlaylists2 error: " + e.toString());
+      print("CategoryRoute.fetchPlaylists error: " + e.toString());
     }
   }
 
   // TODO: figure when to remove data
-  Future<void> _fetchPage(pageKey) async {
+  Future<void> _fetchPage(pageKey, String id, String sortOrder) async {
     try {
       if (_pageMapIsFetching.containsKey(pageKey)) return;
 
       _pageMapIsFetching[pageKey] = true;
 
-      var data =
-          await AppDatabase.fetchTracksPage(_pageSize, pageKey, _sortOrder);
+      List<Track> data;
+
+      if (_currentPlayList.id == "#FAV#") {
+        data =
+            await AppDatabase.fetchTracksPageFav(_pageSize, pageKey, sortOrder);
+      } else {
+        data = await AppDatabase.fetchTracksPage(_pageSize, pageKey, sortOrder);
+      }
 
       print("main._fetchPage: GOT PAGE DATA: " + pageKey.toString());
 
@@ -316,11 +322,13 @@ class CategoryRouteState extends State<CategoryRoute> {
     for (int i = 0; i < tracks.length; i++) {
       AppDatabase.insertTrack(tracks[i]);
     }
+    /*
     final tracks2 = await AppDatabase.fetchTracks();
 
     setState(() {
       _tracks = tracks2;
     });
+    */
   }
 
   void refreshPlaylists() async {
@@ -335,28 +343,42 @@ class CategoryRouteState extends State<CategoryRoute> {
     });
   }
 
-  void loadPlaylist(Playlist playlist) async {
+  void loadPlaylist(Playlist playlist, String sortOrder) async {
     if (playlist.id == "#ALL#") {
-      _fetchPage(0);
       int trackCount = await AppDatabase.fetchTracksCount();
       print("main.loadPlaylist: " + trackCount.toString());
+      _fetchPage(0, playlist.id, sortOrder);
 
       setState(() {
-        //_pageMap.clear(); //is this needed? causes ugly blank page . find another way
-        //_pageMapCount = 0;
-        //_pageMapIsFetching.clear();
+        _sortOrder = sortOrder;
         _itemsContexts.clear();
         _currentPlayList = playlist;
         _trackCount = trackCount;
         _vs = PlayContext.all;
       });
 
-      _pageMap.forEach((k, v) => {_fetchPage(k)});
+      _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
+    } else if (playlist.id == "#FAV#") {
+      int trackCount = await AppDatabase.fetchTracksCountFav();
+      print("main.loadPlaylist: " + trackCount.toString());
+      _fetchPage(0, playlist.id, sortOrder);
+
+      setState(() {
+        _sortOrder = sortOrder;
+        _itemsContexts.clear();
+        _currentPlayList = playlist;
+        _trackCount = trackCount;
+        _vs = PlayContext.all;
+      });
+      _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
     } else {
       final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
       final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
 
+      //refresh();
+
       setState(() {
+        _sortOrder = sortOrder;
         _itemsContexts.clear();
         _currentPlayList = playlist;
         _vs = PlayContext.playlist;
@@ -405,8 +427,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                               ],
                             ),
                             onTap: () {
-                              _sortOrder = 'name';
-                              loadPlaylist(_currentPlayList);
+                              loadPlaylist(_currentPlayList, 'name');
                               //refresh();
                             },
                           )),
@@ -416,8 +437,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                               child: Text('Artist'),
                             ),
                             onTap: () {
-                              _sortOrder = 'artist';
-                              loadPlaylist(_currentPlayList);
+                              loadPlaylist(_currentPlayList, 'artist');
                             },
                           )),
                           new Expanded(
@@ -426,8 +446,8 @@ class CategoryRouteState extends State<CategoryRoute> {
                                     child: Text('Date'),
                                   ),
                                   onTap: () {
-                                    _sortOrder = 'added_date';
-                                    loadPlaylist(_currentPlayList);
+                                    loadPlaylist(
+                                        _currentPlayList, 'added_date');
                                   })),
                           new Expanded(
                               child: InkWell(
@@ -435,8 +455,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                                     child: Text('Playlist'),
                                   ),
                                   onTap: () {
-                                    _sortOrder = 'playlist';
-                                    loadPlaylist(_currentPlayList);
+                                    loadPlaylist(_currentPlayList, 'playlist');
                                   })),
                         ],
                       ),
@@ -554,7 +573,8 @@ class CategoryRouteState extends State<CategoryRoute> {
                                 _fetchTrack(index), index, this);
                           } else {
                             //getMoreData(); // TODO
-                            _fetchPage((index ~/ _pageSize).toInt());
+                            _fetchPage((index ~/ _pageSize).toInt(),
+                                _currentPlayList.id, _sortOrder);
                             return Center(child: CircularProgressIndicator());
                           }
                         }),
@@ -695,9 +715,7 @@ class PlaylistButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () async {
-        crState.loadPlaylist(playList);
-        crState.refresh();
-        //print(crState.currentPlayList);
+        crState.loadPlaylist(playList, "playlist");
       },
       child: new Container(
           //margin: EdgeInsets.,

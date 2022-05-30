@@ -46,11 +46,6 @@ class Player {
   Track? current;
   int current_ind = 0;
 
-  //List<Playlist> playlists
-  //Playlist currentSelected
-
-  //PlayContext _vs = PlayContext.all;
-
   List<Track> _tracks = [];
   List<Track> shuffle_tracks = [];
 
@@ -196,10 +191,10 @@ class Player {
   }
 
   Future<Track> getNextTrack() async {
+    Track c = current as Track;
     if (current != null) {
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {
-          Track c = current as Track;
           print(
               "________________________________________________________________________oid " +
                   currentPlaylist!.id);
@@ -212,13 +207,27 @@ class Player {
           print("________________________________________" + next.name);
           return next;
         } else {
-          Track c = current as Track;
+          //Track c = current as Track;
 
           addToShuffleHistory(c);
           print("Player.getNextTrack: shuffle len " +
               _shufflePlayed.length.toString());
 
           Track next = await AppDatabase.fetchNextTrackShuffle(
+              c.oid as String, _shufflePlayed);
+          print("________________________________________" + next.name);
+          return next;
+        }
+      } else if (currentPlaylist!.id == "#FAV#") {
+        if (!isShuffle) {
+          //Track c = current as Track;
+          Track next = await AppDatabase.fetchNextTrack(
+              c.oid as String, crt.getSortOrder());
+          return next;
+        } else {
+          //Track c = current as Track;
+          addToShuffleHistory(c);
+          Track next = await AppDatabase.fetchNextTrackShuffleFav(
               c.oid as String, _shufflePlayed);
           print("________________________________________" + next.name);
           return next;
@@ -279,23 +288,33 @@ class Player {
   }
 
   Future<Track> getPrevTrack() async {
+    Track c = current as Track;
     if (current != null) {
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {
           if (current != null) {
-            Track c = current as Track;
             Track next = await AppDatabase.fetchPrevTrack(
                 c.oid as String, crt.getSortOrder());
             return next;
           }
         } else {
-          Track c = current as Track;
-
           addToShuffleHistory(c);
-
           Track next = await AppDatabase.fetchNextTrackShuffle(
               c.oid as String, _shufflePlayed);
           print("________________________________________" + next.name);
+          return next;
+        }
+      } else if (currentPlaylist!.id == "#FAV#") {
+        if (!isShuffle) {
+          if (current != null) {
+            Track next = await AppDatabase.fetchPrevTrackFav(
+                c.oid as String, crt.getSortOrder());
+            return next;
+          }
+        } else {
+          addToShuffleHistory(c);
+          Track next = await AppDatabase.fetchNextTrackShuffleFav(
+              c.oid as String, _shufflePlayed);
           return next;
         }
       } else {
