@@ -8,7 +8,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart';
 
-import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
+import 'package:assets_audio_player/assets_audio_player.dart'
+    hide Playlist, LoopMode;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:android_path_provider/android_path_provider.dart';
@@ -17,11 +18,11 @@ import 'package:path/path.dart' as path_lib;
 import 'dart:isolate';
 import 'dart:ui';
 
+import 'Player.dart';
 import 'Track.dart';
 import 'AppDatabase.dart';
 import 'API.dart';
 import 'Playlist.dart';
-import 'Player.dart';
 import 'SeekBar.dart';
 
 /*
@@ -33,6 +34,8 @@ fix added_date sort order
 add album sortOrder
 improve shuffle playing/ implement for playlists
 looping
+
+remote playing
 
 detect when track can't be played due to end of playlist/missing connection to server/other reason
 
@@ -62,9 +65,15 @@ class Choice {
 }
 
 const List<Choice> choices = const <Choice>[
-  const Choice('Button1', Icons.directions_car),
-  const Choice('Button2', Icons.directions_boat),
-  const Choice('Button3', Icons.directions_bus),
+  const Choice('Refresh', Icons.directions_car),
+  const Choice('Download Playlist Data', Icons.directions_boat),
+  const Choice('Download Tracks in Playlist', Icons.directions_bus),
+];
+
+const List<Color> loopModeColors = const <Color>[
+  Colors.black,
+  Colors.blue,
+  Colors.yellow
 ];
 
 class CategoryRoute extends StatefulWidget {
@@ -101,6 +110,7 @@ class CategoryRouteState extends State<CategoryRoute> {
 
   String _currentTrack = "";
   bool _shuffleMode = false;
+  LoopMode _loopMode = LoopMode.none;
 
   GlobalKey<SeekBarState> _animationKey = GlobalKey();
 
@@ -247,7 +257,7 @@ class CategoryRouteState extends State<CategoryRoute> {
   fetchPlaylists() async {
     //print(" fetchPlaylists" + _playlists.length.toString());
     try {
-      List<Playlist> playlists = await Api.fetchPlaylists("", "");
+      List<Playlist> playlists = await Api.fetchPlaylists();
       playlists.insert(0, allPlayList);
       playlists.insert(1, favouritePlayList);
 
@@ -332,7 +342,7 @@ class CategoryRouteState extends State<CategoryRoute> {
   }
 
   void refreshPlaylists() async {
-    List<Playlist> playlists = await Api.fetchPlaylists("track", _sortOrder);
+    List<Playlist> playlists = await Api.fetchPlaylists();
 
     playlists.insert(0, allPlayList);
     playlists.insert(1, favouritePlayList);
@@ -341,6 +351,23 @@ class CategoryRouteState extends State<CategoryRoute> {
       _vs = PlayContext.playlist;
       _playlists = playlists;
     });
+  }
+
+  void onAction(Choice choice) {
+    if (choice.title == 'Refresh') {
+      print("CategoryRoute.onAction: " + "refreshPlaylists()");
+      refreshPlaylists();
+    } else if (choice.title == 'Download Playlist Data') {
+      print(
+          "CategoryRoute.onAction: " + "PlaylistManager.downloadPlaylists();");
+      PlaylistManager.downloadPlaylists();
+    } else if (choice.title == "Download Tracks in Playlist") {
+      if (_vs == PlayContext.playlist) {
+        print("CategoryRoute.onAction: " +
+            "PlaylistManager.downloadTracksInPlaylists(_currentPlayList);");
+        PlaylistManager.downloadTracksInPlaylists(_currentPlayList);
+      }
+    }
   }
 
   void loadPlaylist(Playlist playlist, String sortOrder) async {
@@ -477,7 +504,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                           value: choice,
                           child: new Text(choice.title),
                           onTap: () async {
-                            refreshPlaylists();
+                            onAction(choice);
                           },
                         );
                       }).toList();
@@ -506,10 +533,10 @@ class CategoryRouteState extends State<CategoryRoute> {
                                     this.setState(() {
                                       _shuffleMode = !_shuffleMode;
                                     });
+                                    _player.setShuffleMode(_shuffleMode);
                                     HapticFeedback.lightImpact();
                                     print(
                                         "shuffle: " + _shuffleMode.toString());
-                                    _player.setShuffleMode(_shuffleMode);
                                   },
                                 ),
                                 new IconButton(
@@ -537,9 +564,16 @@ class CategoryRouteState extends State<CategoryRoute> {
                                   },
                                 ),
                                 new IconButton(
-                                  icon: new Icon(Icons.loop),
+                                  icon: new Icon(Icons.loop,
+                                      color: loopModeColors[_loopMode.index]),
                                   onPressed: () {
-                                    //HapticFeedback.lightImpact();
+                                    this.setState(() {
+                                      _loopMode = LoopMode
+                                          .values[(_loopMode.index + 1) % 3];
+                                    });
+                                    _player.setLoopMode(_loopMode);
+                                    HapticFeedback.lightImpact();
+                                    print("loopmode: " + _loopMode.toString());
                                   },
                                 ),
                               ]))

@@ -15,6 +15,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:dart_vlc/dart_vlc.dart' hide Playlist;
 
 import 'Track.dart';
 
@@ -55,7 +56,7 @@ class Player {
   ReceivePort _port = ReceivePort();
   late String _localPath;
 
-  bool isLooping = false;
+  LoopMode loopMode = LoopMode.none;
   bool isShuffle = false;
 
   late bool _permissionReady;
@@ -207,8 +208,6 @@ class Player {
           print("________________________________________" + next.name);
           return next;
         } else {
-          //Track c = current as Track;
-
           addToShuffleHistory(c);
           print("Player.getNextTrack: shuffle len " +
               _shufflePlayed.length.toString());
@@ -220,12 +219,10 @@ class Player {
         }
       } else if (currentPlaylist!.id == "#FAV#") {
         if (!isShuffle) {
-          //Track c = current as Track;
           Track next = await AppDatabase.fetchNextTrack(
               c.oid as String, crt.getSortOrder());
           return next;
         } else {
-          //Track c = current as Track;
           addToShuffleHistory(c);
           Track next = await AppDatabase.fetchNextTrackShuffleFav(
               c.oid as String, _shufflePlayed);
@@ -399,6 +396,8 @@ class Player {
         final trackDir = path_lib.join(trackLibDir, dirname);
         var filePath = path_lib.join(trackDir, path_lib.basename(t.file_path));
 
+        print("Play.play: " + filePath);
+
         var checkFile = File(filePath);
 
         if (checkFile.existsSync()) {
@@ -467,13 +466,6 @@ class Player {
   }
 
   void skipNext() async {
-    /*
-    if (isShuffle) {
-      skipShuffle();
-      return;
-    }
-    */
-
     print('Player.skipNext:');
     if (Platform.isAndroid) {
       try {
@@ -490,13 +482,6 @@ class Player {
   }
 
   void skipPrev() async {
-    /*
-    if (isShuffle) {
-      skipShuffle();
-      return;
-    }
-    */
-
     print('Player.skipPrev:');
     if (Platform.isAndroid) {
       try {
@@ -510,5 +495,9 @@ class Player {
 
   void setShuffleMode(bool shuffleMode) {
     isShuffle = shuffleMode;
+  }
+
+  void setLoopMode(LoopMode loopMode) {
+    this.loopMode = loopMode;
   }
 }

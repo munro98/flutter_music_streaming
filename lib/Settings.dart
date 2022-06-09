@@ -5,13 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart';
 
-import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
-import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path/path.dart' as path_lib;
 
 import 'dart:ui';
@@ -27,8 +22,15 @@ class SettingsRouteState extends State<SettingsRoute> {
   late String serverUrl;
 
   @override
+  void initState() {
+    // read the server url from the database
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // TODO: implement build
+    // create a textBox that edits the server url
+
     throw UnimplementedError();
   }
 }
