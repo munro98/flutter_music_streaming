@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path_lib;
 import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
 
 import 'Track.dart';
 import 'AppDatabase.dart';
@@ -54,6 +55,8 @@ class PlaylistManager {
     // TODO:
     try {
       String? appDocPath = await FileUtil.getAppDocDir("/playlists");
+      String? appMusicPath = await FileUtil.getAppMusicDir("/");
+
       File file = new File(appDocPath! + '/' + p.id + '.json');
 
       String json = await file.readAsString();
@@ -66,12 +69,13 @@ class PlaylistManager {
         print('ID: ' + e['id']);
         Track track = await AppDatabase.fetchTrack(e['id']);
         print('path: ' + track.file_path);
-        /*
-        File trackPath = File(trackRoot! + track.file_path);
+
+        ///*
+        File trackPath = File(appMusicPath! + track.file_path);
         if (!trackPath.existsSync()) {
-          PlaylistManager.download(track);
+          PlaylistManager.download(track, appMusicPath);
         }
-        */
+        //*/
       });
     } catch (e) {
       print("PlaylistManager.downloadTracksInPlaylists: " + e.toString());
@@ -79,6 +83,20 @@ class PlaylistManager {
     }
 
     return new Future<bool>(() => true);
+  }
+
+  // TODO: Test
+  static void download(Track track, String appMusicPath) async {
+    var saveDir = await FileUtil.prepTrackDir(track);
+
+    var url = "http://192.168.0.105:3000/api/track/" + track.id;
+    var id = await FlutterDownloader.enqueue(
+      url: url,
+      savedDir: saveDir,
+      fileName: path_lib.basename(track.file_path),
+      //showNotification: true,
+      //openFileFromNotification: true,
+    );
   }
 
   static Future<List<Track>> fetchTracks() async {
@@ -111,6 +129,4 @@ class PlaylistManager {
     */
     return [];
   }
-
-  static void download(Track track) {}
 }

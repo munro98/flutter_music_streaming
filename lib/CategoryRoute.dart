@@ -28,29 +28,26 @@ import 'SeekBar.dart';
 /*
 todo
 
-store playlist data in local json files
+grey out tracks unavailable when offline
+looping
+improve shuffle playing/ implement for playlists
+
+add settings menu and able to edit server ip
 
 fix added_date sort order
 add album sortOrder
-improve shuffle playing/ implement for playlists
-looping
-
-remote playing
 
 detect when track can't be played due to end of playlist/missing connection to server/other reason
 
 able to enable/disable songs in library and playlists
 drag and drop song into playlist
-show songs available on local storage
-download playlists
-
-add settings menu
 
 sync(play count/ last date played)
 delete (unchecked/ least played songs)
 
 ## stretch goal ##
 
+remote playing
 artist view
 album view
 */
@@ -111,6 +108,7 @@ class CategoryRouteState extends State<CategoryRoute> {
   String _currentTrack = "";
   bool _shuffleMode = false;
   LoopMode _loopMode = LoopMode.none;
+  bool _isConnected = false;
 
   GlobalKey<SeekBarState> _animationKey = GlobalKey();
 

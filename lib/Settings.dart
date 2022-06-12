@@ -11,6 +11,10 @@ import 'package:path/path.dart' as path_lib;
 
 import 'dart:ui';
 
+class Settings {
+  static String url = "http://192.168.0.105:3000";
+}
+
 class SettingsRoute extends StatefulWidget {
   const SettingsRoute();
 

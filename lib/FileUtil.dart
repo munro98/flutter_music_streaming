@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+import 'Track.dart';
+
 class FileUtil {
   static bool _permissionReady = false;
   static bool _isLoading = true;
@@ -64,6 +66,20 @@ class FileUtil {
     } catch (e) {
       print(e);
     }
+  }
+
+  static Future<String> prepTrackDir(Track track) async {
+    String? trackLibDir = await getAppMusicDir('/');
+
+    final dirname = path_lib.dirname(track.file_path);
+    final trackDir = path_lib.join(trackLibDir!, dirname);
+    final savedDir = Directory(trackDir);
+    bool hasExisted = await savedDir.exists();
+
+    if (!hasExisted) {
+      savedDir.create();
+    }
+    return trackDir;
   }
 
   static Future<String?> getAppDocDir(String filePath) async {
