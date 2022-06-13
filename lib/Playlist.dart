@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert' show json, jsonDecode, utf8;
 import 'dart:io';
 
+import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path_lib;
@@ -83,6 +84,61 @@ class PlaylistManager {
     }
 
     return new Future<bool>(() => true);
+  }
+
+  static Future<List<Playlist>> fetchPlaylists() async {
+    print("PlaylistManager:fetchPlaylists");
+
+    List<Playlist> playlist = <Playlist>[];
+
+    String? appDocPath = await FileUtil.getAppDocDir("/playlists");
+    Directory appDocDir = new Directory(appDocPath!);
+    // iterate all files in appDocPath
+    List<FileSystemEntity> folders;
+    folders = appDocDir.listSync(recursive: false, followLinks: false);
+
+    Iterable<File> files = folders.whereType<File>();
+
+    files.forEach((el) async {
+      if (path_lib.basename(el.path).endsWith('.json')) {
+        String jsonData = await el.readAsString();
+
+        var jsonDecode = json.decode(jsonData);
+
+        Playlist play = new Playlist(jsonDecode['id'], jsonDecode['id']);
+        if (jsonDecode['name'] != null) {
+          play.name = jsonDecode['name'];
+        }
+
+        playlist.add(play);
+      }
+    });
+
+    return playlist;
+  }
+
+  static Future<List<String>> fetchPlaylistsTracks(String id) async {
+    print("PlaylistManager:fetchPlaylistsTracks");
+    List<String> tracks = [];
+
+    try {
+      String? appDocPath = await FileUtil.getAppDocDir("/playlists");
+      File file = new File(appDocPath! + '/' + id + '.json');
+
+      if (file.existsSync()) {
+        String jsonData = await file.readAsString();
+        var jsonDecode = json.decode(jsonData);
+
+        print(jsonDecode);
+
+        for (var d in jsonDecode['tracks']) {
+          tracks.add(d['id']);
+        }
+      }
+    } catch (e) {
+      print("PlaylistManager:fetchPlaylistsTracks " + e.toString());
+    }
+    return tracks;
   }
 
   // TODO: Test

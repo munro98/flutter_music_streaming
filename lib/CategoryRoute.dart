@@ -47,7 +47,7 @@ delete (unchecked/ least played songs)
 
 ## stretch goal ##
 
-remote playing
+remote control for other devices(websockets)
 artist view
 album view
 */
@@ -65,6 +65,7 @@ const List<Choice> choices = const <Choice>[
   const Choice('Refresh', Icons.directions_car),
   const Choice('Download Playlist Data', Icons.directions_boat),
   const Choice('Download Tracks in Playlist', Icons.directions_bus),
+  const Choice('Open Settings', Icons.directions_bus),
 ];
 
 const List<Color> loopModeColors = const <Color>[
@@ -110,7 +111,7 @@ class CategoryRouteState extends State<CategoryRoute> {
   LoopMode _loopMode = LoopMode.none;
   bool _isConnected = false;
 
-  GlobalKey<SeekBarState> _animationKey = GlobalKey();
+  GlobalKey<SeekBarState> _seekKey = GlobalKey();
 
   ScrollController _scrollController = new ScrollController();
   //BehaviorSubject<ScrollNotification> _streamController;
@@ -163,7 +164,7 @@ class CategoryRouteState extends State<CategoryRoute> {
     fetchPlaylists();
     loadPlaylist(_currentPlayList, "playlist");
 
-    _animationKey.currentState?.stop();
+    _seekKey.currentState?.stop();
 
     /*
     StreamBuilder(
@@ -179,8 +180,8 @@ class CategoryRouteState extends State<CategoryRoute> {
     _player.assetsAudioPlayer.current.listen((playing) {
       //final path = playing?.audio.path;
       final songDuration = playing?.audio.duration;
-      //_animationKey.currentState?.setDurationValue(songDuration!);
-      _animationKey.currentState?.reset();
+      //_seekKey.currentState?.setDurationValue(songDuration!);
+      _seekKey.currentState?.reset();
 
       print("TTTTTTTTTTTTTTTTTTTT " + songDuration.toString());
     });
@@ -255,7 +256,8 @@ class CategoryRouteState extends State<CategoryRoute> {
   fetchPlaylists() async {
     //print(" fetchPlaylists" + _playlists.length.toString());
     try {
-      List<Playlist> playlists = await Api.fetchPlaylists();
+      //List<Playlist> playlists = await Api.fetchPlaylists();
+      List<Playlist> playlists = await PlaylistManager.fetchPlaylists();
       playlists.insert(0, allPlayList);
       playlists.insert(1, favouritePlayList);
 
@@ -340,7 +342,8 @@ class CategoryRouteState extends State<CategoryRoute> {
   }
 
   void refreshPlaylists() async {
-    List<Playlist> playlists = await Api.fetchPlaylists();
+    //List<Playlist> playlists = await Api.fetchPlaylists();
+    List<Playlist> playlists = await PlaylistManager.fetchPlaylists();
 
     playlists.insert(0, allPlayList);
     playlists.insert(1, favouritePlayList);
@@ -397,7 +400,8 @@ class CategoryRouteState extends State<CategoryRoute> {
       });
       _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
     } else {
-      final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
+      //final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
+      final tracksids = await PlaylistManager.fetchPlaylistsTracks(playlist.id);
       final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
 
       //refresh();
@@ -431,7 +435,7 @@ class CategoryRouteState extends State<CategoryRoute> {
               },
             ))),
             appBar: new AppBar(
-                title: const Text('Whale Music'),
+                title: Text(_currentPlayList.name),
                 bottom: new PreferredSize(
                   preferredSize: const Size.fromHeight(48.0),
                   child: new Theme(
@@ -514,7 +518,7 @@ class CategoryRouteState extends State<CategoryRoute> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SeekBar(this, key: _animationKey),
+                      SeekBar(this, key: _seekKey),
                       Padding(
                           padding:
                               const EdgeInsets.fromLTRB(6.0, 0.0, 6.0, 6.0),
@@ -616,6 +620,8 @@ class CategoryRouteState extends State<CategoryRoute> {
   void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
     _player.play(l, currentPlayList, index, _tracks, _trackCount);
 
+    _seekKey.currentState?.reset();
+
     this.setState(() {
       this._currentTrack = l.oid!;
       this._playingPlayList = currentPlayList;
@@ -662,73 +668,51 @@ class TrackItem extends StatelessWidget {
       id: index,
     ));
 
-    return GestureDetector(
-        onHorizontalDragStart: (DragStartDetails d) {
-          print("dragStart");
-        },
-        onHorizontalDragEnd: (DragEndDetails d) async {
-          print("dragEnd");
-        },
-        child: Row(children: [
-          new Flexible(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                new Container(
-                    //margin: const EdgeInsets.all(8.0),
-
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          new Container(
-                              //margin: const EdgeInsets.all(0.0),
-                              child: Row(children: [
-                            SizedBox(
-                                height: 40.0,
-                                width: 40.0,
-                                child: Checkbox(
-                                    value: l.is_active,
-                                    onChanged: (b) {
-                                      //l.is_active = b as bool;
-                                    })),
-                            new Align(
-                              //alignment: Alignment.topLeft,
-                              child: InkWell(
-                                  splashColor: Colors.deepOrange,
-                                  highlightColor: Colors.deepPurple,
-                                  onTap: () async {
-                                    print('tap2!');
-                                    //final bytes = await (await crt.audioCache.loadAsFile(l.file_path)).readAsBytes();
-                                    //crt.audioCache.playBytes(bytes);
-                                    //playingPlayList
-                                    crt.play(l, crt._currentPlayList, index,
-                                        crt._tracks);
-                                  },
-                                  child: Column(children: [
-                                    Text(
-                                      l.artist +
-                                          " - " +
-                                          l.name +
-                                          //l.file_path +
-                                          "(" +
-                                          l.oid.toString(),
-                                      style: new TextStyle(fontSize: 13),
-                                    )
-                                  ])),
-                            )
-                          ])) //,
-                        ]),
-                    decoration: new BoxDecoration(
-                      color: (crt._currentTrack == l.oid &&
-                              crt._playingPlayList.id ==
-                                  crt._currentPlayList.id)
-                          ? Colors.blue[300]
-                          : index % 2 == 1
-                              ? Colors.grey[200]
-                              : Colors.grey[50],
-                    )),
-              ]))
-        ]));
+    return Container(
+        margin: const EdgeInsets.all(0.0),
+        decoration: new BoxDecoration(
+          color: (crt._currentTrack == l.oid &&
+                  crt._playingPlayList.id == crt._currentPlayList.id)
+              ? Colors.blue[300]
+              : index % 2 == 1
+                  ? Colors.grey[200]
+                  : Colors.grey[50],
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+                height: 40.0,
+                width: 40.0,
+                child: Checkbox(
+                    value: l.is_active,
+                    onChanged: (b) {
+                      //l.is_active = b as bool;
+                    })),
+            Container(
+              child: Flexible(
+                  child: TextButton(
+                      style: TextButton.styleFrom(
+                        primary: Colors.transparent,
+                        minimumSize: const Size.fromHeight(50), // NEW
+                      ),
+                      child: new Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            l.artist + " - " + l.name //+
+                            //l.file_path +
+                            //"(" +
+                            //l.oid.toString()
+                            ,
+                            style: new TextStyle(
+                                fontSize: 13, color: Colors.black),
+                          )),
+                      onPressed: () => {
+                            crt.play(
+                                l, crt._currentPlayList, index, crt._tracks)
+                          })),
+            )
+          ],
+        ));
   }
 
   @override

@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter_music_app/AppDatabase.dart';
+import 'package:flutter_music_app/Settings.dart';
 import 'package:http/http.dart';
 import 'package:path/path.dart' as path_lib;
 
@@ -29,8 +30,6 @@ import 'CategoryRoute.dart';
 enum PlayContext { all, playlist }
 
 enum LoopMode { none, one, all }
-
-const String STREAM_URL = "http://192.168.0.105:3000/api/track/";
 
 class Player {
   static int maxShufflePlayed = 16;
@@ -360,7 +359,7 @@ class Player {
         //do nothing
       } else {
         //download
-        var url = "http://192.168.0.105:3000/api/track/" + track.id;
+        var url = Settings.urlHTTP + "/api/track/" + track.id;
         var id = await FlutterDownloader.enqueue(
           url: url,
           savedDir: saveDir,
@@ -419,7 +418,8 @@ class Player {
     if (Platform.isAndroid) {
       try {
         //assetsAudioPlayer.stop();
-        await assetsAudioPlayer.open(Audio.network(STREAM_URL + track.id));
+        await assetsAudioPlayer
+            .open(Audio.network(Settings.urlHTTP + "/api/track/" + track.id));
 
         //assetsAudioPlayer.open(
         //  Audio("assets/DROELOE - Taking Flight.flac"),

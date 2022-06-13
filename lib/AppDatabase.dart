@@ -906,18 +906,21 @@ class AppDatabase {
       List<Track> tracks = [];
 
       for (var id in trackids) {
-        final List<Map<String, dynamic>> maps =
-            await db.rawQuery('SELECT * FROM track WHERE id = \'' + id + '\'');
-        tracks.add(Track(
+        final List<Map<String, dynamic>> maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE id = \'' + id + '\'');
+        Track t = Track(
           maps[0]['name'],
-          maps[0]['id'],
+          maps[0]['id'].toString(),
           maps[0]['file_path'],
           artist: maps[0]['artist'],
-        ));
+        );
+        t.oid = maps[0]['oid'].toString();
+        tracks.add(t);
       }
 
       return tracks;
     } catch (e) {
+      print("AppDatabase.fetchPlaylistTracks:" + e.toString());
       return [];
     }
   }

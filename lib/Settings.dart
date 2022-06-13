@@ -12,7 +12,10 @@ import 'package:path/path.dart' as path_lib;
 import 'dart:ui';
 
 class Settings {
-  static String url = "http://192.168.0.105:3000";
+  static String url = "192.168.0.105:3000";
+
+  // must be set when changing the url
+  static String urlHTTP = "http://192.168.0.105:3000";
 }
 
 class SettingsRoute extends StatefulWidget {

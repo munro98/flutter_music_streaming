@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert' show json, utf8;
 import 'dart:io';
 
-import 'Track.dart';
-import 'Playlist.dart';
 import 'package:http/http.dart' as http;
 
+import 'Track.dart';
+import 'Playlist.dart';
+import 'Settings.dart';
+
 class Api {
-  static final String url = '192.168.0.105:3000';
+  //static final String url = '192.168.0.105:3000';
 
   /*
   static Future<List<Playlist>> fetchPlaylists () async {
@@ -47,7 +49,8 @@ class Api {
   static Future<List<String>> fetchPlaylistsTracks(String id) async {
     print("fetching playlists");
 
-    final httpRequest = await http.get(Uri.http(url, 'api/playlist/' + id));
+    final httpRequest =
+        await http.get(Uri.http(Settings.url, 'api/playlist/' + id));
 
     List<String> tracks = [];
 
@@ -72,7 +75,7 @@ class Api {
     print("fetching tracks");
     //Client.userAgent = "testApp";
 
-    final httpRequest = await http.get(Uri.http(url, 'api/track'));
+    final httpRequest = await http.get(Uri.http(Settings.url, 'api/track'));
 
     //final httpResponse = await httpRequest.close();
 
@@ -109,7 +112,7 @@ class Api {
     print("fetching playlists");
     //Client.userAgent = "testApp";
 
-    final httpRequest = await http.get(Uri.http(url, 'api/playlist'));
+    final httpRequest = await http.get(Uri.http(Settings.url, 'api/playlist'));
 
     List<Playlist> playlist = <Playlist>[];
 
@@ -131,7 +134,8 @@ class Api {
     print("fetching playlists");
     //Client.userAgent = "testApp";
 
-    final httpRequest = await http.get(Uri.http(url, 'api/playlist/' + id));
+    final httpRequest =
+        await http.get(Uri.http(Settings.url, 'api/playlist/' + id));
 
     List<Playlist> playlist = <Playlist>[];
 
