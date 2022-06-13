@@ -144,14 +144,6 @@ class CategoryRouteState extends State<CategoryRoute> {
 
     FlutterDownloader.registerCallback(downloadCallback);
 
-    //DateTime.parse("2000-07-20 20:18:04Z")
-    _tracks.add(new Track(
-        "Taking Flight", "456", "DROELOE - Taking Flight.flac",
-        artist: "DROELOE"));
-    _tracks.add(new Track("Happy Endings", "456",
-        "Mike Shinoda - Happy Endings (feat. iann dior and UPSAHL).flac",
-        artist: "Mike Shinoda"));
-
     //AppDatabase.openConnection().then((value) => this.refresh());
     //AppDatabase.openConnection();
     AppDatabase.openConnection()
@@ -164,7 +156,7 @@ class CategoryRouteState extends State<CategoryRoute> {
     fetchPlaylists();
     loadPlaylist(_currentPlayList, "playlist");
 
-    _seekKey.currentState?.stop();
+    //_seekKey.currentState?.stop();
 
     /*
     StreamBuilder(
@@ -181,10 +173,14 @@ class CategoryRouteState extends State<CategoryRoute> {
       //final path = playing?.audio.path;
       final songDuration = playing?.audio.duration;
       //_seekKey.currentState?.setDurationValue(songDuration!);
-      _seekKey.currentState?.reset();
+      //_seekKey.currentState?.reset();
+
+      _seekKey.currentState?.setProgressValue(0.0);
 
       print("TTTTTTTTTTTTTTTTTTTT " + songDuration.toString());
     });
+
+    //Duration po = _player.assetsAudioPlayer.currentPosition.value;
 
     print(" initState" + _tracks.length.toString());
   }
@@ -196,6 +192,14 @@ class CategoryRouteState extends State<CategoryRoute> {
     _itemsContexts.clear();
 
     super.dispose();
+  }
+
+  void playerPausedCallback() {
+    _seekKey.currentState?.stop();
+  }
+
+  void playerPlayCallback() {
+    _seekKey.currentState?.resume();
   }
 
   void _onScroll(ScrollUpdateNotification notifications) {
@@ -620,7 +624,12 @@ class CategoryRouteState extends State<CategoryRoute> {
   void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
     _player.play(l, currentPlayList, index, _tracks, _trackCount);
 
-    _seekKey.currentState?.reset();
+    //_seekKey.currentState?.reset();
+    Duration d = _player.assetsAudioPlayer.currentPosition.value;
+
+    //_seekKey.currentState?.setProgressValue(0.0);
+    //_seekKey.currentState?.reset();
+    //_seekKey.currentState?.setRepeat(d);
 
     this.setState(() {
       this._currentTrack = l.oid!;

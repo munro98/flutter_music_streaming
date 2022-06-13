@@ -66,11 +66,20 @@ class Player {
   void init(Playlist playlist) {
     currentPlaylist = playlist;
 
+    assetsAudioPlayer.playerState.listen((event) {
+      if (event == PlayerState.pause) {
+        print("Player: music pause");
+        crt.playerPausedCallback();
+      } else if (event == PlayerState.play) {
+        print("Player: music play");
+        crt.playerPlayCallback();
+      }
+    });
+
     assetsAudioPlayer.playlistAudioFinished.listen((Playing playing) {
       if (assetsAudioPlayer.playerState.value == PlayerState.play) {
         print("Player: music finished play");
       } else if (assetsAudioPlayer.playerState.value == PlayerState.pause) {
-        print("Player: music finished pause");
       } else if (assetsAudioPlayer.playerState.value == PlayerState.stop) {
         print("Player: music finished stopped");
         if (!ignoreStop) {

@@ -36,9 +36,22 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
     controller.stop();
   }
 
+  void resume() {
+    controller.forward(from: controller.value);
+  }
+
   void setProgressValue(double val) {
     this.setState(() {
       controller.value = val;
+    });
+    controller.forward(from: val);
+  }
+
+  void setProgressDuration(Duration duration) {
+    this.setState(() {
+      var a = ((duration.inMilliseconds as double) /
+          (controller.duration?.inMilliseconds as double)) as double;
+      controller.value = a;
     });
   }
 
@@ -46,6 +59,21 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
     this.setState(() {
       controller.duration = duration;
     });
+  }
+
+  void setRepeat(Duration duration) {
+    //_beginOffset = _endOffset;
+    //_endOffset = _endOffset + _animationOffset;
+
+    setState(() {
+      //_characterPosition = _generateCharacterPosition();
+      controller.value = 0.5;
+    });
+    //controller.reset();
+    //controller.duration = const Duration(seconds: 120);
+    //controller.repeat(min: 0, max: 1, reverse: false);
+    controller.forward(from: 0.5);
+    //initState();
   }
 
   @override
@@ -57,7 +85,7 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
         setState(() {});
       });
     //controller.
-    controller.repeat(reverse: false);
+    controller.repeat(min: 0, max: 1, reverse: false);
     //controller.
     super.initState();
   }
