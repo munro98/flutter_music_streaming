@@ -53,7 +53,6 @@ class PlaylistManager {
 
   //Note: requires Local SQLite database to be synced with server DB
   static Future<bool> downloadTracksInPlaylists(Playlist p) async {
-    // TODO:
     try {
       String? appDocPath = await FileUtil.getAppDocDir("/playlists");
       String? appMusicPath = await FileUtil.getAppMusicDir("/");
@@ -153,6 +152,24 @@ class PlaylistManager {
       //showNotification: true,
       //openFileFromNotification: true,
     );
+  }
+
+  // TODO: Test
+  static Future<bool> checkAvailableOnDisk(Track t) async {
+    try {
+      String? appMusicPath = await FileUtil.getAppMusicDir("/");
+
+      File file = new File(appMusicPath! + '/' + t.file_path);
+
+      if (file.existsSync()) {
+        return true;
+      }
+    } catch (e) {
+      print("PlaylistManager.downloadTracksInPlaylists: " + e.toString());
+      return false;
+    }
+
+    return new Future<bool>(() => false);
   }
 
   static Future<List<Track>> fetchTracks() async {

@@ -6,13 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
 import 'dart:ui';
 
-import 'CategoryRoute.dart';
+import 'MainRoute.dart';
 
 /// This is the stateful widget that the main application instantiates.
 class SeekBar extends StatefulWidget {
   const SeekBar(this.crt, {Key? key}) : super(key: key);
 
-  final CategoryRouteState crt;
+  final MainRouteState crt;
 
   @override
   State<SeekBar> createState() => SeekBarState(crt);
@@ -23,7 +23,7 @@ class SeekBar extends StatefulWidget {
 class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
   late AnimationController controller;
 
-  final CategoryRouteState crt;
+  final MainRouteState crt;
   double progressBarValue = 0.0;
 
   SeekBarState(this.crt);

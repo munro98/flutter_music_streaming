@@ -25,7 +25,7 @@ import 'API.dart';
 import 'Playlist.dart';
 
 import 'Playlist.dart';
-import 'CategoryRoute.dart';
+import 'MainRoute.dart';
 
 enum PlayContext { all, playlist }
 
@@ -34,11 +34,11 @@ enum LoopMode { none, one, all }
 class Player {
   static int maxShufflePlayed = 16;
 
-  Player(CategoryRouteState crt) {
+  Player(MainRouteState crt) {
     this.crt = crt;
   }
 
-  late CategoryRouteState crt;
+  late MainRouteState crt;
 
   AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
 
@@ -65,6 +65,8 @@ class Player {
 
   void init(Playlist playlist) {
     currentPlaylist = playlist;
+
+    assetsAudioPlayer.showNotification = true;
 
     assetsAudioPlayer.playerState.listen((event) {
       if (event == PlayerState.pause) {
@@ -204,16 +206,12 @@ class Player {
     if (current != null) {
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {
-          print(
-              "________________________________________________________________________oid " +
-                  currentPlaylist!.id);
-          print(
-              "________________________________________________________________________oid " +
-                  c.oid.toString());
+          print("oid " + currentPlaylist!.id);
+          print("oid " + c.oid.toString());
 
           Track next = await AppDatabase.fetchNextTrack(
               c.oid as String, crt.getSortOrder());
-          print("________________________________________" + next.name);
+          print("" + next.name);
           return next;
         } else {
           addToShuffleHistory(c);
@@ -222,7 +220,7 @@ class Player {
 
           Track next = await AppDatabase.fetchNextTrackShuffle(
               c.oid as String, _shufflePlayed);
-          print("________________________________________" + next.name);
+          print("" + next.name);
           return next;
         }
       } else if (currentPlaylist!.id == "#FAV#") {
@@ -234,7 +232,7 @@ class Player {
           addToShuffleHistory(c);
           Track next = await AppDatabase.fetchNextTrackShuffleFav(
               c.oid as String, _shufflePlayed);
-          print("________________________________________" + next.name);
+          print("" + next.name);
           return next;
         }
       } else {
@@ -274,11 +272,7 @@ class Player {
           */
 
         } else {
-          print(
-              "#######################################################################################################################################" +
-                  current_ind.toString() +
-                  " " +
-                  _tracks.length.toString());
+          print("" + current_ind.toString() + " " + _tracks.length.toString());
           if (current_ind == _tracks.length) {
             current_ind = 0;
           } else {
@@ -306,7 +300,7 @@ class Player {
           addToShuffleHistory(c);
           Track next = await AppDatabase.fetchNextTrackShuffle(
               c.oid as String, _shufflePlayed);
-          print("________________________________________" + next.name);
+          print("" + next.name);
           return next;
         }
       } else if (currentPlaylist!.id == "#FAV#") {

@@ -28,15 +28,20 @@ import 'SeekBar.dart';
 /*
 todo
 
-grey out tracks unavailable when offline
-looping
-improve shuffle playing/ implement for playlists
+mini notification player widget
+https://pub.dev/packages/flutter_local_notifications
 
-add settings menu and able to edit server ip
 
+do playlist sorting
+shuffle playing for playlists
 fix added_date sort order
 add album sortOrder
 
+grey out tracks unavailable when offline
+looping
+
+add windows support with vlc_player
+add settings menu and able to edit server ip
 detect when track can't be played due to end of playlist/missing connection to server/other reason
 
 able to enable/disable songs in library and playlists
@@ -74,14 +79,14 @@ const List<Color> loopModeColors = const <Color>[
   Colors.yellow
 ];
 
-class CategoryRoute extends StatefulWidget {
-  const CategoryRoute();
+class MainRoute extends StatefulWidget {
+  const MainRoute();
 
   @override
-  CategoryRouteState createState() => CategoryRouteState();
+  MainRouteState createState() => MainRouteState();
 }
 
-class CategoryRouteState extends State<CategoryRoute> {
+class MainRouteState extends State<MainRoute> {
   //String? localFilePath;
 
   final Playlist allPlayList = new Playlist("All Music", "#ALL#");
@@ -100,6 +105,7 @@ class CategoryRouteState extends State<CategoryRoute> {
   Track? current;
 
   final int _pageSize = 128;
+  final int _maxPagesSize = 16;
 
   Map<int, bool> _pageMapIsFetching = Map<int, bool>();
   Map<int, List<Track>> _pageMap = Map<int, List<Track>>();
@@ -270,17 +276,36 @@ class CategoryRouteState extends State<CategoryRoute> {
         _vs = PlayContext.playlist;
       });
     } catch (e) {
-      print("CategoryRoute.fetchPlaylists error: " + e.toString());
+      print("MainRoute.fetchPlaylists error: " + e.toString());
     }
   }
 
   // TODO: figure when to remove data
-  Future<void> _fetchPage(pageKey, String id, String sortOrder) async {
+  Future<void> _fetchPage(int pageKey, String id, String sortOrder) async {
     try {
       if (_pageMapIsFetching.containsKey(pageKey)) return;
 
       _pageMapIsFetching[pageKey] = true;
 
+      // Remove old pages outside of the scroll viewable area
+      /*
+      // TODO: figure out a better way to do this
+      if (_pageMap.length > _maxPagesSize) {
+        for (int i = 0; i < pageKey - 10; i++) {
+          if (_pageMap.containsKey(i)) {
+            _pageMap.remove(i);
+          }
+        }
+        for (int i = pageKey+10; i > pageKey; i--) {
+          if (_pageMap.containsKey(i)) {
+            _pageMap.remove(i);
+          }
+        }
+        
+      }
+      */
+
+      // fill new pages
       List<Track> data;
 
       if (_currentPlayList.id == "#FAV#") {
@@ -360,15 +385,14 @@ class CategoryRouteState extends State<CategoryRoute> {
 
   void onAction(Choice choice) {
     if (choice.title == 'Refresh') {
-      print("CategoryRoute.onAction: " + "refreshPlaylists()");
+      print("MainRoute.onAction: " + "refreshPlaylists()");
       refreshPlaylists();
     } else if (choice.title == 'Download Playlist Data') {
-      print(
-          "CategoryRoute.onAction: " + "PlaylistManager.downloadPlaylists();");
+      print("MainRoute.onAction: " + "PlaylistManager.downloadPlaylists();");
       PlaylistManager.downloadPlaylists();
     } else if (choice.title == "Download Tracks in Playlist") {
       if (_vs == PlayContext.playlist) {
-        print("CategoryRoute.onAction: " +
+        print("MainRoute.onAction: " +
             "PlaylistManager.downloadTracksInPlaylists(_currentPlayList);");
         PlaylistManager.downloadTracksInPlaylists(_currentPlayList);
       }
@@ -456,39 +480,87 @@ class CategoryRouteState extends State<CategoryRoute> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text('Title'),
-                                Icon(Icons.arrow_drop_down)
+                                _sortOrder == 'name' || _sortOrder == 'namedesc'
+                                    ? _sortOrder == 'name'
+                                        ? Icon(Icons.arrow_drop_down)
+                                        : Icon(Icons.arrow_drop_up)
+                                    : Container()
                               ],
                             ),
                             onTap: () {
-                              loadPlaylist(_currentPlayList, 'name');
-                              //refresh();
+                              if (_sortOrder == 'name') {
+                                loadPlaylist(_currentPlayList, 'namedesc');
+                              } else {
+                                loadPlaylist(_currentPlayList, 'name');
+                              }
                             },
                           )),
                           new Expanded(
                               child: InkWell(
-                            child: Center(
-                              child: Text('Artist'),
-                            ),
+                            child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('Artist'),
+                                  _sortOrder == 'artist' ||
+                                          _sortOrder == 'artistdesc'
+                                      ? _sortOrder == 'artist'
+                                          ? Icon(Icons.arrow_drop_down)
+                                          : Icon(Icons.arrow_drop_up)
+                                      : Container()
+                                ]),
                             onTap: () {
-                              loadPlaylist(_currentPlayList, 'artist');
+                              if (_sortOrder == 'artist') {
+                                loadPlaylist(_currentPlayList, 'artistdesc');
+                              } else {
+                                loadPlaylist(_currentPlayList, 'artist');
+                              }
                             },
                           )),
                           new Expanded(
                               child: InkWell(
-                                  child: Center(
-                                    child: Text('Date'),
-                                  ),
+                                  child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text('Date'),
+                                        _sortOrder == 'added_date' ||
+                                                _sortOrder == 'added_datedesc'
+                                            ? _sortOrder == 'added_date'
+                                                ? Icon(Icons.arrow_drop_down)
+                                                : Icon(Icons.arrow_drop_up)
+                                            : Container()
+                                      ]),
                                   onTap: () {
-                                    loadPlaylist(
-                                        _currentPlayList, 'added_date');
+                                    if (_sortOrder == 'added_date') {
+                                      loadPlaylist(
+                                          _currentPlayList, 'added_datedesc');
+                                    } else {
+                                      loadPlaylist(
+                                          _currentPlayList, 'added_date');
+                                    }
                                   })),
                           new Expanded(
                               child: InkWell(
-                                  child: Center(
-                                    child: Text('Playlist'),
-                                  ),
+                                  child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text('Playlist'),
+                                        _sortOrder == 'playlist' ||
+                                                _sortOrder == 'playlistdesc'
+                                            ? _sortOrder == 'playlist'
+                                                ? Icon(Icons.arrow_drop_down)
+                                                : Icon(Icons.arrow_drop_up)
+                                            : Container()
+                                      ]),
                                   onTap: () {
-                                    loadPlaylist(_currentPlayList, 'playlist');
+                                    if (_sortOrder == 'playlist') {
+                                      loadPlaylist(
+                                          _currentPlayList, 'playlistdesc');
+                                    } else {
+                                      loadPlaylist(
+                                          _currentPlayList, 'playlist');
+                                    }
                                   })),
                         ],
                       ),
@@ -667,7 +739,7 @@ class TrackItem extends StatelessWidget {
   const TrackItem(this.l, this.index, this.crt);
 
   final Track l;
-  final CategoryRouteState crt;
+  final MainRouteState crt;
   final index;
 
   Widget _buildTiles(Track root, BuildContext context) {
@@ -734,7 +806,7 @@ class PlaylistButton extends StatelessWidget {
   const PlaylistButton(this.playList, this.crState);
 
   final Playlist playList;
-  final CategoryRouteState crState;
+  final MainRouteState crState;
 
   @override
   Widget build(BuildContext context) {

@@ -9,8 +9,6 @@ import 'Playlist.dart';
 import 'Settings.dart';
 
 class Api {
-  //static final String url = '192.168.0.105:3000';
-
   /*
   static Future<List<Playlist>> fetchPlaylists () async {
 
