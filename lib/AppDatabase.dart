@@ -905,6 +905,7 @@ class AppDatabase {
 
       List<Track> tracks = [];
 
+      int counter = 0;
       for (var id in trackids) {
         final List<Map<String, dynamic>> maps = await db.rawQuery(
             'SELECT rowid as oid, * FROM track WHERE id = \'' + id + '\'');
@@ -915,7 +916,9 @@ class AppDatabase {
           artist: maps[0]['artist'],
         );
         t.oid = maps[0]['oid'].toString();
+        t.playlist_index = counter;
         tracks.add(t);
+        counter++;
       }
 
       return tracks;

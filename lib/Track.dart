@@ -4,6 +4,12 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+class TrackPair {
+  TrackPair(this.index, this.track);
+  int index;
+  Track track;
+}
+
 class Track {
   Track(String this.name, String this.id, String this.file_path,
       {String this.artist = "",
@@ -31,6 +37,7 @@ class Track {
   String file_path;
   String id; // mongoID
   String? oid; // sqliteID
+  int? playlist_index;
   bool is_active;
   bool is_downloaded;
   bool? is_missing;
@@ -76,5 +83,38 @@ class Track {
       'size': size,
       'format': format,
     };
+  }
+
+  // TODO:
+  static int playlistCompare(Track l, Track r) {
+    return l.playlist_index! - r.playlist_index!;
+  }
+
+  static int playlistCompareReverse(Track l, Track r) {
+    return r.playlist_index! - l.playlist_index!;
+  }
+
+  static int nameCompare(Track l, Track r) {
+    return l.name.toLowerCase().compareTo(r.name.toLowerCase());
+  }
+
+  static int nameCompareReverse(Track l, Track r) {
+    return r.name.toLowerCase().compareTo(l.name.toLowerCase());
+  }
+
+  static int artistCompare(Track l, Track r) {
+    return l.artist.toLowerCase().compareTo(r.artist.toLowerCase());
+  }
+
+  static int artistCompareReverse(Track l, Track r) {
+    return r.artist.toLowerCase().compareTo(l.artist.toLowerCase());
+  }
+
+  static int addedCompare(Track l, Track r) {
+    return 0; //l.added_date! - r.added_date;
+  }
+
+  static int addedCompareReverse(Track l, Track r) {
+    return 0; //l.added_date! - r.added_date;
   }
 }

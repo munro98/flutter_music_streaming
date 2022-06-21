@@ -29,6 +29,8 @@ import 'MainRoute.dart';
 
 enum PlayContext { all, playlist }
 
+enum SortOrder { name, name_desc, added, added_desc, playlist, playlist_desc }
+
 enum LoopMode { none, one, all }
 
 class Player {
@@ -43,11 +45,14 @@ class Player {
   AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
 
   Playlist? currentPlaylist;
+  PlayContext _playContext = PlayContext.all;
+  String _sortOrder = 'playlist';
+
   Track? current;
-  int current_ind = 0;
+  int currentIndex = 0;
 
   List<Track> _tracks = [];
-  List<Track> shuffle_tracks = [];
+  List<Track> _shuffleTracks = [];
 
   Queue<String> _shufflePlayed = new Queue();
   int _trackCount = 0;
@@ -172,23 +177,6 @@ class Player {
     }
   }
   */
-
-  void toggleShuffle() {
-    isShuffle = !isShuffle;
-
-    if (isShuffle) {
-      //if (tracks.length < THREASH) {
-      current_ind = 0;
-      shuffle_tracks = _tracks;
-      shuffle_tracks.shuffle();
-      //  isLargePlaylist = false;
-
-      //} else {
-      //  isLargePlaylist = true;
-      //}
-    }
-  }
-
   void addToShuffleHistory(Track t) {
     if (t.oid != null) {
       _shufflePlayed.addLast(t.oid!);
@@ -203,6 +191,7 @@ class Player {
 
   Future<Track> getNextTrack() async {
     Track c = current as Track;
+
     if (current != null) {
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {
@@ -237,49 +226,22 @@ class Player {
         }
       } else {
         if (isShuffle) {
-          //if (!isLargePlaylist) {
-
-          var t = shuffle_tracks[current_ind];
-          current_ind = current_ind + 1 % shuffle_tracks.length;
+          var t = _shuffleTracks[currentIndex];
+          currentIndex = currentIndex + 1;
+          if (currentIndex > _shuffleTracks.length) {
+            currentIndex = 0;
+            _shuffleTracks = _tracks;
+            _shuffleTracks.shuffle();
+          }
           return t;
-          /*
-          } else {
-
-            var rng = new Random();
-            int new_ind = rng.nextInt(tracks.length);
-
-            int i = 0;
-            while (i < 4) {
-              if (!set.contains(new_ind)) {
-                break;
-              }
-              new_ind = rng.nextInt(tracks.length);
-
-            }
-
-            if (queue.length == 128) {
-
-              int front = queue.iterator.current;
-              queue.removeFirst();
-              set.remove(front);
-
-              queue.addLast(new_ind);
-
-            }
-
-            return tracks[new_ind];
-          }
-          */
-
         } else {
-          print("" + current_ind.toString() + " " + _tracks.length.toString());
-          if (current_ind == _tracks.length) {
-            current_ind = 0;
+          print("" + currentIndex.toString() + " " + _tracks.length.toString());
+          if (currentIndex == _tracks.length) {
+            currentIndex = 0;
           } else {
-            current_ind = current_ind + 1;
+            currentIndex = currentIndex + 1;
           }
-
-          return _tracks[current_ind];
+          return _tracks[currentIndex];
         }
       }
     }
@@ -317,13 +279,13 @@ class Player {
           return next;
         }
       } else {
-        int ind = current_ind - 1;
-        if (ind < 0) {
-          ind = shuffle_tracks.length - 1;
+        var t = _shuffleTracks[currentIndex];
+        currentIndex = currentIndex + 1;
+        if (currentIndex > _shuffleTracks.length) {
+          currentIndex = 0;
+          _shuffleTracks = _tracks;
+          _shuffleTracks.shuffle();
         }
-
-        var t = shuffle_tracks[ind];
-        current_ind = ind;
         return t;
       }
     }
@@ -374,16 +336,17 @@ class Player {
     }
   }
 
-  void play(Track t, Playlist? p, int index, List<Track> track,
-      int trackCount) async {
+  void play(Track t, Playlist? p, int index, List<Track> track, int trackCount,
+      String sortOrder) async {
     if (p!.id != currentPlaylist?.id) {
       _shufflePlayed = new Queue();
     }
     current = t;
     currentPlaylist = p;
-    current_ind = index;
+    currentIndex = index;
     _tracks = track;
     _trackCount = trackCount;
+    _sortOrder = sortOrder;
 
     print("Player.play: " + t.name + ", " + t.oid.toString());
 
@@ -476,7 +439,8 @@ class Player {
 
         print('Player.skip_next: ' + t.file_path);
         crt.setCurrentTrack(t);
-        play(t, currentPlaylist, current_ind, _tracks, _trackCount);
+        play(
+            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
       } catch (e) {
         print('Player.skip_next: error' + e.toString());
       }
@@ -490,7 +454,8 @@ class Player {
       try {
         Track t = await getPrevTrack();
         crt.setCurrentTrack(t);
-        play(t, currentPlaylist, current_ind, _tracks, _trackCount);
+        play(
+            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
       } catch (e) {}
     } else if (Platform.isIOS) {
     } else if (Platform.isWindows || Platform.isMacOS) {}
@@ -498,9 +463,23 @@ class Player {
 
   void setShuffleMode(bool shuffleMode) {
     isShuffle = shuffleMode;
+
+    if (currentPlaylist!.id == "#ALL#" || currentPlaylist?.id == "#FAV#") {
+    } else {
+      _shuffleTracks = _tracks;
+      _shuffleTracks.shuffle();
+    }
   }
 
   void setLoopMode(LoopMode loopMode) {
     this.loopMode = loopMode;
+  }
+
+  String getCurrentSortOrder() {
+    return _sortOrder;
+  }
+
+  List<Track> getTracks() {
+    return _tracks;
   }
 }

@@ -14,6 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path/path.dart' as path_lib;
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'dart:isolate';
 import 'dart:ui';
@@ -45,7 +46,7 @@ add settings menu and able to edit server ip
 detect when track can't be played due to end of playlist/missing connection to server/other reason
 
 able to enable/disable songs in library and playlists
-drag and drop song into playlist
+drag and drop songs into playlist
 
 sync(play count/ last date played)
 delete (unchecked/ least played songs)
@@ -126,12 +127,6 @@ class MainRouteState extends State<MainRoute> {
   final int ignoreEvery = 1000;
   int ignoreCounter = 0;
 
-  //late String _localPath;
-  //late bool _permissionReady;
-  //List<_TaskInfo>? _tasks;
-  //late List<_ItemHolder> _items;
-  //late bool _isLoading;
-
   @override
   void initState() {
     super.initState();
@@ -149,31 +144,12 @@ class MainRouteState extends State<MainRoute> {
     });
 
     FlutterDownloader.registerCallback(downloadCallback);
-
-    //AppDatabase.openConnection().then((value) => this.refresh());
-    //AppDatabase.openConnection();
     AppDatabase.openConnection()
-        .then((value) => loadPlaylist(_currentPlayList, "playlist"));
+        .then((value) => loadPlaylist(_currentPlayList, _sortOrder));
 
-    //_permissionReady = false;
-    //_isLoading = true;
     _player.init(_currentPlayList);
 
     fetchPlaylists();
-    loadPlaylist(_currentPlayList, "playlist");
-
-    //_seekKey.currentState?.stop();
-
-    /*
-    StreamBuilder(
-        stream: _player.assetsAudioPlayer.currentPosition,
-        builder: (context, asyncSnapshot) {
-          final bool isPlaying = asyncSnapshot.data as bool;
-          return Text(isPlaying ? 'Pause' : 'Play');
-        });
-    */
-
-    //_player.assetsAudioPlayer.
 
     _player.assetsAudioPlayer.current.listen((playing) {
       //final path = playing?.audio.path;
@@ -183,10 +159,8 @@ class MainRouteState extends State<MainRoute> {
 
       _seekKey.currentState?.setProgressValue(0.0);
 
-      print("TTTTTTTTTTTTTTTTTTTT " + songDuration.toString());
+      print("song duration " + songDuration.toString());
     });
-
-    //Duration po = _player.assetsAudioPlayer.currentPosition.value;
 
     print(" initState" + _tracks.length.toString());
   }
@@ -355,19 +329,14 @@ class MainRouteState extends State<MainRoute> {
     });
   }
 
+  // update local database with server database
   void refresh() async {
+    // TODO: pagingate server API requests
     final tracks = await Api.fetchTracks("track", _sortOrder);
 
     for (int i = 0; i < tracks.length; i++) {
       AppDatabase.insertTrack(tracks[i]);
     }
-    /*
-    final tracks2 = await AppDatabase.fetchTracks();
-
-    setState(() {
-      _tracks = tracks2;
-    });
-    */
   }
 
   void refreshPlaylists() async {
@@ -400,6 +369,12 @@ class MainRouteState extends State<MainRoute> {
   }
 
   void loadPlaylist(Playlist playlist, String sortOrder) async {
+    // coming from another playlist to one currently playing
+    if (playlist.id != _currentPlayList.id &&
+        playlist.id == _player.currentPlaylist?.id) {
+      sortOrder = _player.getCurrentSortOrder();
+    }
+
     if (playlist.id == "#ALL#") {
       int trackCount = await AppDatabase.fetchTracksCount();
       print("main.loadPlaylist: " + trackCount.toString());
@@ -428,19 +403,92 @@ class MainRouteState extends State<MainRoute> {
       });
       _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
     } else {
-      //final tracksids = await Api.fetchPlaylistsTracks(playlist.id);
-      final tracksids = await PlaylistManager.fetchPlaylistsTracks(playlist.id);
-      final tracks2 = await AppDatabase.fetchPlaylistTracks(tracksids);
+      // Switching to actively playing playlist
+      if (playlist.id == _currentPlayList.id &&
+          playlist.id == _player.currentPlaylist!.id) {
+        List<TrackPair> trackP = [];
+        List<Track> playerTracks = _player.getTracks();
 
-      //refresh();
+        for (int i = 0; i < playerTracks.length; i++) {
+          trackP.add(new TrackPair(i, playerTracks[i]));
+        }
 
-      setState(() {
-        _sortOrder = sortOrder;
-        _itemsContexts.clear();
-        _currentPlayList = playlist;
-        _vs = PlayContext.playlist;
-        _tracks = tracks2;
-      });
+        if (sortOrder == "name") {
+          trackP.sort(((l, r) => Track.nameCompare(l.track, r.track)));
+        } else if (sortOrder == "namedesc") {
+          trackP.sort(((l, r) => Track.nameCompareReverse(l.track, r.track)));
+        } else if (sortOrder == "artist") {
+          trackP.sort(((l, r) => Track.artistCompare(l.track, r.track)));
+        } else if (sortOrder == "artistdesc") {
+          trackP.sort(((l, r) => Track.artistCompareReverse(l.track, r.track)));
+        } else if (sortOrder == "added_date") {
+          trackP.sort(((l, r) => Track.addedCompare(l.track, r.track)));
+        } else if (sortOrder == "added_datedesc") {
+          trackP.sort(((l, r) => Track.addedCompareReverse(l.track, r.track)));
+        } else if (sortOrder == "playlist") {
+          trackP.sort(((l, r) => Track.playlistCompare(l.track, r.track)));
+        } else if (sortOrder == "playlistdesc") {
+          trackP
+              .sort(((l, r) => Track.playlistCompareReverse(l.track, r.track)));
+        }
+        /* move the player index after reordering the playlist
+        a 0 <- index
+        b 1
+        c 2
+        -> after sorting
+        c 2
+        b 1
+        a 0 <- index
+        */
+        List<Track> sortedTracks = [];
+        int pIndex = _player.currentIndex;
+        int newPIndex = -1;
+        for (int i = 0; i < trackP.length; i++) {
+          sortedTracks.add(trackP[i].track);
+          if (trackP[i].index == pIndex) {
+            newPIndex = i;
+          }
+        }
+        _player.currentIndex = newPIndex;
+
+        setState(() {
+          _sortOrder = sortOrder;
+          _itemsContexts.clear();
+          _currentPlayList = playlist;
+          _vs = PlayContext.playlist;
+          _tracks = sortedTracks;
+        });
+      } else {
+        final tracksids =
+            await PlaylistManager.fetchPlaylistsTracks(playlist.id);
+        List<Track> trackP = await AppDatabase.fetchPlaylistTracks(tracksids);
+
+        if (sortOrder == "name") {
+          trackP.sort(((l, r) => Track.nameCompare(l, r)));
+        } else if (sortOrder == "namedesc") {
+          trackP.sort(((l, r) => Track.nameCompareReverse(l, r)));
+        } else if (sortOrder == "artist") {
+          trackP.sort(((l, r) => Track.artistCompare(l, r)));
+        } else if (sortOrder == "artistdesc") {
+          trackP.sort(((l, r) => Track.artistCompareReverse(l, r)));
+        } else if (sortOrder == "added_date") {
+          trackP.sort(((l, r) => Track.addedCompare(l, r)));
+        } else if (sortOrder == "added_datedesc") {
+          trackP.sort(((l, r) => Track.addedCompareReverse(l, r)));
+        } else if (sortOrder == "playlist") {
+          trackP.sort(((l, r) => Track.playlistCompare(l, r)));
+        } else if (sortOrder == "playlistdesc") {
+          trackP.sort(((l, r) => Track.playlistCompareReverse(l, r)));
+        }
+
+        setState(() {
+          _sortOrder = sortOrder;
+          _itemsContexts.clear();
+          _currentPlayList = playlist;
+          _vs = PlayContext.playlist;
+          _tracks = trackP;
+        });
+      }
     }
   }
 
@@ -694,7 +742,7 @@ class MainRouteState extends State<MainRoute> {
   }
 
   void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
-    _player.play(l, currentPlayList, index, _tracks, _trackCount);
+    _player.play(l, currentPlayList, index, _tracks, _trackCount, _sortOrder);
 
     //_seekKey.currentState?.reset();
     Duration d = _player.assetsAudioPlayer.currentPosition.value;
@@ -733,8 +781,6 @@ class ItemContext {
   bool operator ==(Object other) => other is ItemContext && other.id == id;
 }
 
-// Displays one Entry. If the entry has children then it's displayed
-// with an ExpansionTile.
 class TrackItem extends StatelessWidget {
   const TrackItem(this.l, this.index, this.crt);
 
@@ -752,7 +798,8 @@ class TrackItem extends StatelessWidget {
     return Container(
         margin: const EdgeInsets.all(0.0),
         decoration: new BoxDecoration(
-          color: (crt._currentTrack == l.oid &&
+          color: (crt._currentTrack ==
+                      l.oid && //TODO: use index if in playlistmode
                   crt._playingPlayList.id == crt._currentPlayList.id)
               ? Colors.blue[300]
               : index % 2 == 1
