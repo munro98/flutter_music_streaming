@@ -29,6 +29,9 @@ import 'SeekBar.dart';
 /*
 todo
 
+add windows support with vlc_player
+add settings menu and able to edit server ip
+
 mini notification player widget
 https://pub.dev/packages/flutter_local_notifications
 
@@ -40,19 +43,14 @@ add album sortOrder
 
 grey out tracks unavailable when offline
 looping
-
-add windows support with vlc_player
-add settings menu and able to edit server ip
 detect when track can't be played due to end of playlist/missing connection to server/other reason
 
 able to enable/disable songs in library and playlists
 drag and drop songs into playlist
-
-sync(play count/ last date played)
 delete (unchecked/ least played songs)
 
 ## stretch goal ##
-
+sync(play count/ last date played)
 remote control for other devices(websockets)
 artist view
 album view
@@ -97,7 +95,7 @@ class MainRouteState extends State<MainRoute> {
   late Playlist _currentPlayList = allPlayList;
   late Playlist _playingPlayList = allPlayList;
   Choice _selectedChoice = choices[0];
-  String _sortOrder = 'playlist';
+  SortOrder _sortOrder = SortOrder.playlist;
 
   PlayContext _vs = PlayContext.all;
   List<Playlist> _playlists = [];
@@ -119,9 +117,6 @@ class MainRouteState extends State<MainRoute> {
   bool _isConnected = false;
 
   GlobalKey<SeekBarState> _seekKey = GlobalKey();
-
-  ScrollController _scrollController = new ScrollController();
-  //BehaviorSubject<ScrollNotification> _streamController;
   late Set<ItemContext> _itemsContexts;
 
   final int ignoreEvery = 1000;
@@ -182,54 +177,6 @@ class MainRouteState extends State<MainRoute> {
     _seekKey.currentState?.resume();
   }
 
-  void _onScroll(ScrollUpdateNotification notifications) {
-    // Iterate through each item to check
-    // whether it is in the viewport
-    ignoreCounter++;
-    ignoreCounter = ignoreCounter % ignoreEvery;
-
-    if (ignoreCounter != 1) {
-      //return;
-    }
-
-    for (final ItemContext item in _itemsContexts) {
-      // Retrieve the RenderObject, linked to a specific item
-      final RenderObject? object = item.context.findRenderObject();
-
-      // If none was to be found, or if not attached, leave by now
-      // As we are dealing with Slivers, items no longer part of the
-      // viewport will be detached
-      if (object == null || !object.attached) {
-        return;
-      }
-
-      // Retrieve the viewport related to the scroll area
-      final RenderAbstractViewport? viewport =
-          RenderAbstractViewport.of(object);
-      final double? vpHeight = viewport?.paintBounds.height;
-      final ScrollableState? scrollableState = Scrollable.of(item.context);
-      final ScrollPosition? scrollPosition = scrollableState?.position;
-      final RevealedOffset vpOffset = viewport!.getOffsetToReveal(object, 0.0);
-
-      // Retrieve the dimensions of the item
-      final Size? size = object.semanticBounds.size;
-
-      // Check if the item is in the viewport
-      final double deltaTop = vpOffset.offset - scrollPosition!.pixels;
-      final double deltaBottom = deltaTop + size!.height;
-
-      bool isInViewport = false;
-
-      isInViewport = (deltaTop >= 0.0 && deltaTop < vpHeight!);
-      if (!isInViewport) {
-        isInViewport = (deltaBottom > 0.0 && deltaBottom < vpHeight!);
-      }
-
-      print(
-          '${item.id} --> offset: ${vpOffset.offset} -- VP?: ${isInViewport}');
-    }
-  }
-
   static void downloadCallback(
       String id, DownloadTaskStatus status, int progress) {
     final SendPort send =
@@ -255,7 +202,7 @@ class MainRouteState extends State<MainRoute> {
   }
 
   // TODO: figure when to remove data
-  Future<void> _fetchPage(int pageKey, String id, String sortOrder) async {
+  Future<void> _fetchPage(int pageKey, String id, SortOrder sortOrder) async {
     try {
       if (_pageMapIsFetching.containsKey(pageKey)) return;
 
@@ -332,7 +279,7 @@ class MainRouteState extends State<MainRoute> {
   // update local database with server database
   void refresh() async {
     // TODO: pagingate server API requests
-    final tracks = await Api.fetchTracks("track", _sortOrder);
+    final tracks = await Api.fetchTracks("track", "");
 
     for (int i = 0; i < tracks.length; i++) {
       AppDatabase.insertTrack(tracks[i]);
@@ -368,7 +315,7 @@ class MainRouteState extends State<MainRoute> {
     }
   }
 
-  void loadPlaylist(Playlist playlist, String sortOrder) async {
+  void loadPlaylist(Playlist playlist, SortOrder sortOrder) async {
     // coming from another playlist to one currently playing
     if (playlist.id != _currentPlayList.id &&
         playlist.id == _player.currentPlaylist?.id) {
@@ -413,21 +360,21 @@ class MainRouteState extends State<MainRoute> {
           trackP.add(new TrackPair(i, playerTracks[i]));
         }
 
-        if (sortOrder == "name") {
+        if (sortOrder == SortOrder.name) {
           trackP.sort(((l, r) => Track.nameCompare(l.track, r.track)));
-        } else if (sortOrder == "namedesc") {
+        } else if (sortOrder == SortOrder.name_desc) {
           trackP.sort(((l, r) => Track.nameCompareReverse(l.track, r.track)));
-        } else if (sortOrder == "artist") {
+        } else if (sortOrder == SortOrder.artist) {
           trackP.sort(((l, r) => Track.artistCompare(l.track, r.track)));
-        } else if (sortOrder == "artistdesc") {
+        } else if (sortOrder == SortOrder.artist_desc) {
           trackP.sort(((l, r) => Track.artistCompareReverse(l.track, r.track)));
-        } else if (sortOrder == "added_date") {
+        } else if (sortOrder == SortOrder.added) {
           trackP.sort(((l, r) => Track.addedCompare(l.track, r.track)));
-        } else if (sortOrder == "added_datedesc") {
+        } else if (sortOrder == SortOrder.added_desc) {
           trackP.sort(((l, r) => Track.addedCompareReverse(l.track, r.track)));
-        } else if (sortOrder == "playlist") {
+        } else if (sortOrder == SortOrder.playlist) {
           trackP.sort(((l, r) => Track.playlistCompare(l.track, r.track)));
-        } else if (sortOrder == "playlistdesc") {
+        } else if (sortOrder == SortOrder.playlist_desc) {
           trackP
               .sort(((l, r) => Track.playlistCompareReverse(l.track, r.track)));
         }
@@ -463,21 +410,21 @@ class MainRouteState extends State<MainRoute> {
             await PlaylistManager.fetchPlaylistsTracks(playlist.id);
         List<Track> trackP = await AppDatabase.fetchPlaylistTracks(tracksids);
 
-        if (sortOrder == "name") {
+        if (sortOrder == SortOrder.name) {
           trackP.sort(((l, r) => Track.nameCompare(l, r)));
-        } else if (sortOrder == "namedesc") {
+        } else if (sortOrder == SortOrder.name_desc) {
           trackP.sort(((l, r) => Track.nameCompareReverse(l, r)));
-        } else if (sortOrder == "artist") {
+        } else if (sortOrder == SortOrder.artist) {
           trackP.sort(((l, r) => Track.artistCompare(l, r)));
-        } else if (sortOrder == "artistdesc") {
+        } else if (sortOrder == SortOrder.artist_desc) {
           trackP.sort(((l, r) => Track.artistCompareReverse(l, r)));
-        } else if (sortOrder == "added_date") {
+        } else if (sortOrder == SortOrder.added) {
           trackP.sort(((l, r) => Track.addedCompare(l, r)));
-        } else if (sortOrder == "added_datedesc") {
+        } else if (sortOrder == SortOrder.added_desc) {
           trackP.sort(((l, r) => Track.addedCompareReverse(l, r)));
-        } else if (sortOrder == "playlist") {
+        } else if (sortOrder == SortOrder.playlist) {
           trackP.sort(((l, r) => Track.playlistCompare(l, r)));
-        } else if (sortOrder == "playlistdesc") {
+        } else if (sortOrder == SortOrder.playlist_desc) {
           trackP.sort(((l, r) => Track.playlistCompareReverse(l, r)));
         }
 
@@ -528,18 +475,20 @@ class MainRouteState extends State<MainRoute> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text('Title'),
-                                _sortOrder == 'name' || _sortOrder == 'namedesc'
-                                    ? _sortOrder == 'name'
+                                _sortOrder == SortOrder.name ||
+                                        _sortOrder == SortOrder.name_desc
+                                    ? _sortOrder == SortOrder.name
                                         ? Icon(Icons.arrow_drop_down)
                                         : Icon(Icons.arrow_drop_up)
                                     : Container()
                               ],
                             ),
                             onTap: () {
-                              if (_sortOrder == 'name') {
-                                loadPlaylist(_currentPlayList, 'namedesc');
+                              if (_sortOrder == SortOrder.name) {
+                                loadPlaylist(
+                                    _currentPlayList, SortOrder.name_desc);
                               } else {
-                                loadPlaylist(_currentPlayList, 'name');
+                                loadPlaylist(_currentPlayList, SortOrder.name);
                               }
                             },
                           )),
@@ -549,18 +498,20 @@ class MainRouteState extends State<MainRoute> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text('Artist'),
-                                  _sortOrder == 'artist' ||
-                                          _sortOrder == 'artistdesc'
-                                      ? _sortOrder == 'artist'
+                                  _sortOrder == SortOrder.artist ||
+                                          _sortOrder == SortOrder.artist_desc
+                                      ? _sortOrder == SortOrder.artist
                                           ? Icon(Icons.arrow_drop_down)
                                           : Icon(Icons.arrow_drop_up)
                                       : Container()
                                 ]),
                             onTap: () {
-                              if (_sortOrder == 'artist') {
-                                loadPlaylist(_currentPlayList, 'artistdesc');
+                              if (_sortOrder == SortOrder.artist) {
+                                loadPlaylist(
+                                    _currentPlayList, SortOrder.artist_desc);
                               } else {
-                                loadPlaylist(_currentPlayList, 'artist');
+                                loadPlaylist(
+                                    _currentPlayList, SortOrder.artist);
                               }
                             },
                           )),
@@ -571,20 +522,21 @@ class MainRouteState extends State<MainRoute> {
                                           MainAxisAlignment.center,
                                       children: [
                                         Text('Date'),
-                                        _sortOrder == 'added_date' ||
-                                                _sortOrder == 'added_datedesc'
-                                            ? _sortOrder == 'added_date'
+                                        _sortOrder == SortOrder.added ||
+                                                _sortOrder ==
+                                                    SortOrder.added_desc
+                                            ? _sortOrder == SortOrder.added
                                                 ? Icon(Icons.arrow_drop_down)
                                                 : Icon(Icons.arrow_drop_up)
                                             : Container()
                                       ]),
                                   onTap: () {
-                                    if (_sortOrder == 'added_date') {
-                                      loadPlaylist(
-                                          _currentPlayList, 'added_datedesc');
+                                    if (_sortOrder == SortOrder.added) {
+                                      loadPlaylist(_currentPlayList,
+                                          SortOrder.added_desc);
                                     } else {
                                       loadPlaylist(
-                                          _currentPlayList, 'added_date');
+                                          _currentPlayList, SortOrder.added);
                                     }
                                   })),
                           new Expanded(
@@ -594,20 +546,21 @@ class MainRouteState extends State<MainRoute> {
                                           MainAxisAlignment.center,
                                       children: [
                                         Text('Playlist'),
-                                        _sortOrder == 'playlist' ||
-                                                _sortOrder == 'playlistdesc'
-                                            ? _sortOrder == 'playlist'
+                                        _sortOrder == SortOrder.playlist ||
+                                                _sortOrder ==
+                                                    SortOrder.playlist_desc
+                                            ? _sortOrder == SortOrder.playlist
                                                 ? Icon(Icons.arrow_drop_down)
                                                 : Icon(Icons.arrow_drop_up)
                                             : Container()
                                       ]),
                                   onTap: () {
-                                    if (_sortOrder == 'playlist') {
-                                      loadPlaylist(
-                                          _currentPlayList, 'playlistdesc');
+                                    if (_sortOrder == SortOrder.playlist) {
+                                      loadPlaylist(_currentPlayList,
+                                          SortOrder.playlist_desc);
                                     } else {
                                       loadPlaylist(
-                                          _currentPlayList, 'playlist');
+                                          _currentPlayList, SortOrder.playlist);
                                     }
                                   })),
                         ],
@@ -763,7 +716,7 @@ class MainRouteState extends State<MainRoute> {
     });
   }
 
-  String getSortOrder() {
+  SortOrder getSortOrder() {
     return this._sortOrder;
   }
 }
@@ -859,7 +812,7 @@ class PlaylistButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () async {
-        crState.loadPlaylist(playList, "playlist");
+        crState.loadPlaylist(playList, SortOrder.playlist);
       },
       child: new Container(
           //margin: EdgeInsets.,

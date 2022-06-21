@@ -29,7 +29,16 @@ import 'MainRoute.dart';
 
 enum PlayContext { all, playlist }
 
-enum SortOrder { name, name_desc, added, added_desc, playlist, playlist_desc }
+enum SortOrder {
+  name,
+  name_desc,
+  artist,
+  artist_desc,
+  added,
+  added_desc,
+  playlist,
+  playlist_desc
+}
 
 enum LoopMode { none, one, all }
 
@@ -46,7 +55,7 @@ class Player {
 
   Playlist? currentPlaylist;
   PlayContext _playContext = PlayContext.all;
-  String _sortOrder = 'playlist';
+  SortOrder _sortOrder = SortOrder.playlist;
 
   Track? current;
   int currentIndex = 0;
@@ -337,7 +346,7 @@ class Player {
   }
 
   void play(Track t, Playlist? p, int index, List<Track> track, int trackCount,
-      String sortOrder) async {
+      SortOrder sortOrder) async {
     if (p!.id != currentPlaylist?.id) {
       _shufflePlayed = new Queue();
     }
@@ -475,7 +484,7 @@ class Player {
     this.loopMode = loopMode;
   }
 
-  String getCurrentSortOrder() {
+  SortOrder getCurrentSortOrder() {
     return _sortOrder;
   }
 
