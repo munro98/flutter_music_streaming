@@ -25,6 +25,7 @@ import 'AppDatabase.dart';
 import 'API.dart';
 import 'Playlist.dart';
 import 'SeekBar.dart';
+import 'Settings.dart';
 
 /*
 todo
@@ -299,7 +300,7 @@ class MainRouteState extends State<MainRoute> {
     });
   }
 
-  void onAction(Choice choice) {
+  void onAction(Choice choice, BuildContext ctx) {
     if (choice.title == 'Refresh') {
       print("MainRoute.onAction: " + "refreshPlaylists()");
       refreshPlaylists();
@@ -312,6 +313,16 @@ class MainRouteState extends State<MainRoute> {
             "PlaylistManager.downloadTracksInPlaylists(_currentPlayList);");
         PlaylistManager.downloadTracksInPlaylists(_currentPlayList);
       }
+    } else if (choice.title == "Open Settings") {
+      print("MainRoute.onAction: Open Settings");
+      Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (c) => const SettingsRoute()),
+      );
+      Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (c) => const SettingsRoute()),
+      );
     }
   }
 
@@ -398,6 +409,8 @@ class MainRouteState extends State<MainRoute> {
         }
         _player.currentIndex = newPIndex;
 
+        _player.setTracks(sortedTracks);
+
         setState(() {
           _sortOrder = sortOrder;
           _itemsContexts.clear();
@@ -440,7 +453,7 @@ class MainRouteState extends State<MainRoute> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext rootContext) {
     return new DefaultTabController(
         length: 3,
         child: new Scaffold(
@@ -462,7 +475,8 @@ class MainRouteState extends State<MainRoute> {
                 bottom: new PreferredSize(
                   preferredSize: const Size.fromHeight(48.0),
                   child: new Theme(
-                    data: Theme.of(context).copyWith(accentColor: Colors.white),
+                    data: Theme.of(rootContext)
+                        .copyWith(accentColor: Colors.white),
                     child: new Container(
                       height: 48.0,
                       alignment: Alignment.center,
@@ -583,7 +597,7 @@ class MainRouteState extends State<MainRoute> {
                           value: choice,
                           child: new Text(choice.title),
                           onTap: () async {
-                            onAction(choice);
+                            onAction(choice, context);
                           },
                         );
                       }).toList();
@@ -638,6 +652,12 @@ class MainRouteState extends State<MainRoute> {
                                   iconSize: 40,
                                   icon: new Icon(Icons.skip_next),
                                   onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (c) =>
+                                              const SettingsRoute()),
+                                    );
                                     _player.skipNext();
                                     HapticFeedback.lightImpact();
                                   },
@@ -685,7 +705,6 @@ class MainRouteState extends State<MainRoute> {
                             return new TrackItem(
                                 _fetchTrack(index), index, this);
                           } else {
-                            //getMoreData(); // TODO
                             _fetchPage((index ~/ _pageSize).toInt(),
                                 _currentPlayList.id, _sortOrder);
                             return Center(child: CircularProgressIndicator());
@@ -751,8 +770,7 @@ class TrackItem extends StatelessWidget {
     return Container(
         margin: const EdgeInsets.all(0.0),
         decoration: new BoxDecoration(
-          color: (crt._currentTrack ==
-                      l.oid && //TODO: use index if in playlistmode
+          color: ((crt._currentTrack == l.oid && true) &&
                   crt._playingPlayList.id == crt._currentPlayList.id)
               ? Colors.blue[300]
               : index % 2 == 1
@@ -780,6 +798,7 @@ class TrackItem extends StatelessWidget {
                           alignment: Alignment.centerLeft,
                           child: Text(
                             l.artist + " - " + l.name //+
+                            //l.added_date.toString() //+
                             //l.file_path +
                             //"(" +
                             //l.oid.toString()

@@ -288,14 +288,24 @@ class Player {
           return next;
         }
       } else {
-        var t = _shuffleTracks[currentIndex];
-        currentIndex = currentIndex + 1;
-        if (currentIndex > _shuffleTracks.length) {
-          currentIndex = 0;
-          _shuffleTracks = _tracks;
-          _shuffleTracks.shuffle();
+        if (isShuffle) {
+          var t = _shuffleTracks[currentIndex];
+          currentIndex = currentIndex + 1;
+          if (currentIndex > _shuffleTracks.length) {
+            currentIndex = 0;
+            _shuffleTracks = _tracks;
+            _shuffleTracks.shuffle();
+          }
+          return t;
+        } else {
+          print("" + currentIndex.toString() + " " + _tracks.length.toString());
+          if (currentIndex == 0) {
+            currentIndex = _tracks.length - 1;
+          } else {
+            currentIndex = currentIndex - 1;
+          }
+          return _tracks[currentIndex];
         }
-        return t;
       }
     }
     throw Exception();
@@ -490,5 +500,9 @@ class Player {
 
   List<Track> getTracks() {
     return _tracks;
+  }
+
+  void setTracks(List<Track> sortedTracks) {
+    _tracks = sortedTracks;
   }
 }

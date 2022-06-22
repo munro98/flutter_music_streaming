@@ -95,7 +95,8 @@ class Api {
         //track.artists = artists;
       }
 
-      //DateTime.parse(d['release_date'])
+      var da = DateTime.parse(d['release_date']);
+      print(da.toString());
 
       Track track =
           new Track(d['name'], d['_id'], d['file_path'], artist: d['artist']);

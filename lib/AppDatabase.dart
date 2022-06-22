@@ -322,9 +322,9 @@ class AppDatabase {
         oid: maps[0]['oid'].toString(),
       );
       t.oid = maps[0]['oid'].toString();
-      //if (maps[0]['added_date'] != null) {
-      //t.added_date = maps[0]['added_date'];
-      //}
+      if (maps[0]['added_date'] != null) {
+        t.added_date = maps[0]['added_date'];
+      }
       //*/
       //return Track("", "", "");
       return t;
@@ -669,9 +669,9 @@ class AppDatabase {
         oid: maps[0]['oid'].toString(),
       );
       t.oid = maps[0]['oid'].toString();
-      //if (maps[0]['added_date'] != null) {
-      //t.added_date = maps[0]['added_date'];
-      //}
+      if (maps[0]['added_date'] != null) {
+        t.added_date = maps[0]['added_date'];
+      }
       //*/
       //return Track("", "", "");
       return t;
@@ -917,6 +917,9 @@ class AppDatabase {
           artist: maps[0]['artist'],
         );
         t.oid = maps[0]['oid'].toString();
+        if (maps[0]['added_date'] != null) {
+          t.added_date = maps[0]['added_date'];
+        }
         t.playlist_index = counter;
         tracks.add(t);
         counter++;
@@ -930,33 +933,6 @@ class AppDatabase {
   }
 
   /*
-  static Future<List<Track>> fetchPlaylistTracksPage (String id ,int _limit, int offset) async {
-    try {
-      print("fetching tracks");
-      // Get a reference to the database.
-      //final Database db = await (database as Future<Database>);
-
-      //final List<Map<String, dynamic>> maps = await db.rawQuery(
-      //  'SELECT track.name, track,id, track.file_path FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' + offset.toString() + ' )ORDER BY oid ASC LIMIT ' + _limit.toString());
-      //'SELECT track.name, track,id, track.file_path FROM track INNER JOIN  WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' + offset.toString() + ' )ORDER BY oid ASC LIMIT ' + _limit.toString()
-
-      List<Track> tracks = List.generate(maps.length, (i) {
-        return Track(
-          maps[i]['name'],
-          maps[i]['id'],
-          maps[i]['file_path'],
-          artist: maps[i]['artist'],
-        );
-      });
-
-      print("fetching tracks " + tracks.length.toString());
-
-      return tracks;
-    } catch (e) {
-      return [];
-    }
-  }
-
   Future<void> updateDog(Dog dog) async {
     // Get a reference to the database.
     final db = await database;

@@ -8,6 +8,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart';
 
 import 'package:path/path.dart' as path_lib;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dart:ui';
 
@@ -29,16 +30,44 @@ class SettingsRoute extends StatefulWidget {
 
 class SettingsRouteState extends State<SettingsRoute> {
   late String serverUrl;
-  final TextEditingController _serverController = TextEditingController();
+  final TextEditingController _urlController = TextEditingController();
   final TextEditingController _userController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _localLibraryController = TextEditingController();
 
+  final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+
   @override
-  void initState() {
+  void initState() async {
     // read the server url from the database
     super.initState();
-    _serverController.text = Settings.url;
+
+    final SharedPreferences prefs = await _prefs;
+    String? urlS = prefs.getString('url');
+    if (urlS != null) {
+      _urlController.text = urlS;
+      //Settings.url = urlS;
+    }
+    String? userS = prefs.getString('user');
+    if (userS != null) {
+      _userController.text = userS;
+      //Settings.user = userS;
+    }
+    String? passwordS = prefs.getString('password');
+    if (passwordS != null) {
+      _passwordController.text = passwordS;
+      //Settings.password = passwordS;
+    }
+
+    print("Settings.initState: Init settings state");
+  }
+
+  void _saveSettings() async {
+    print("Settings.Save");
+    final SharedPreferences prefs = await _prefs;
+    prefs.setString('url', _urlController.text).then((bool success) {});
+    prefs.setString('user', _userController.text);
+    prefs.setString('password', _passwordController.text);
   }
 
   @override
@@ -61,7 +90,7 @@ class SettingsRouteState extends State<SettingsRoute> {
                   children: <Widget>[
                     Text("Server"),
                     TextFieldInput(
-                        textEditingController: _serverController,
+                        textEditingController: _urlController,
                         hintText: "Server Address",
                         textInputType: TextInputType.name),
                     TextFieldInput(
@@ -73,12 +102,12 @@ class SettingsRouteState extends State<SettingsRoute> {
                         hintText: "Password",
                         textInputType: TextInputType.visiblePassword),
                     TextButton(
-                      child: Text("Login"),
+                      child: Text("Save"),
                       style: TextButton.styleFrom(
                         primary: Color.fromARGB(255, 88, 134, 34),
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      onPressed: () => {print("login")},
+                      onPressed: () => {_saveSettings()},
                     )
                   ]))),
     );
