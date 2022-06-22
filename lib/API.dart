@@ -116,6 +116,7 @@ class Api {
     List<Playlist> playlist = <Playlist>[];
 
     if (httpRequest.statusCode != HttpStatus.OK) {
+      throw Exception("No connection");
       return playlist;
     }
 

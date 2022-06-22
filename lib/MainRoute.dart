@@ -30,16 +30,18 @@ import 'Settings.dart';
 /*
 todo
 
-add windows support with vlc_player
+dragable seekbar
+shuffle playing for playlists
+fix added_date sort order
+
+add windows support with vlc_player for music and 
+sqflite_common_ffi for database
+
 add settings menu and able to edit server ip
 
 mini notification player widget
 https://pub.dev/packages/flutter_local_notifications
 
-
-do playlist sorting
-shuffle playing for playlists
-fix added_date sort order
 add album sortOrder
 
 grey out tracks unavailable when offline
@@ -118,17 +120,15 @@ class MainRouteState extends State<MainRoute> {
   bool _isConnected = false;
 
   GlobalKey<SeekBarState> _seekKey = GlobalKey();
-  late Set<ItemContext> _itemsContexts;
+  GlobalKey<ScaffoldState> scaffKey = new GlobalKey<ScaffoldState>();
 
-  final int ignoreEvery = 1000;
-  int ignoreCounter = 0;
+  final ItemScrollController itemScrollController = ItemScrollController();
+  final ItemPositionsListener itemPositionsListener =
+      ItemPositionsListener.create();
 
   @override
   void initState() {
     super.initState();
-
-    _itemsContexts = Set<ItemContext>();
-    // Initialize a stream controller
 
     IsolateNameServer.registerPortWithName(
         _port.sendPort, 'downloader_send_port');
@@ -150,7 +150,7 @@ class MainRouteState extends State<MainRoute> {
     _player.assetsAudioPlayer.current.listen((playing) {
       //final path = playing?.audio.path;
       final songDuration = playing?.audio.duration;
-      //_seekKey.currentState?.setDurationValue(songDuration!);
+      _seekKey.currentState?.setDurationValue(songDuration!);
       //_seekKey.currentState?.reset();
 
       _seekKey.currentState?.setProgressValue(0.0);
@@ -164,8 +164,6 @@ class MainRouteState extends State<MainRoute> {
   @override
   void dispose() {
     IsolateNameServer.removePortNameMapping('downloader_send_port');
-
-    _itemsContexts.clear();
 
     super.dispose();
   }
@@ -198,6 +196,11 @@ class MainRouteState extends State<MainRoute> {
         _vs = PlayContext.playlist;
       });
     } catch (e) {
+      // TODO: make this work
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Hi, I am a snack bar!"),
+      ));
+
       print("MainRoute.fetchPlaylists error: " + e.toString());
     }
   }
@@ -340,7 +343,6 @@ class MainRouteState extends State<MainRoute> {
 
       setState(() {
         _sortOrder = sortOrder;
-        _itemsContexts.clear();
         _currentPlayList = playlist;
         _trackCount = trackCount;
         _vs = PlayContext.all;
@@ -354,7 +356,6 @@ class MainRouteState extends State<MainRoute> {
 
       setState(() {
         _sortOrder = sortOrder;
-        _itemsContexts.clear();
         _currentPlayList = playlist;
         _trackCount = trackCount;
         _vs = PlayContext.all;
@@ -413,7 +414,6 @@ class MainRouteState extends State<MainRoute> {
 
         setState(() {
           _sortOrder = sortOrder;
-          _itemsContexts.clear();
           _currentPlayList = playlist;
           _vs = PlayContext.playlist;
           _tracks = sortedTracks;
@@ -443,7 +443,6 @@ class MainRouteState extends State<MainRoute> {
 
         setState(() {
           _sortOrder = sortOrder;
-          _itemsContexts.clear();
           _currentPlayList = playlist;
           _vs = PlayContext.playlist;
           _tracks = trackP;
@@ -457,6 +456,7 @@ class MainRouteState extends State<MainRoute> {
     return new DefaultTabController(
         length: 3,
         child: new Scaffold(
+            key: scaffKey,
             drawer: new Drawer(
 
                 //child: new Padding(
@@ -645,6 +645,10 @@ class MainRouteState extends State<MainRoute> {
                                   icon: new Icon(Icons.play_arrow),
                                   onPressed: () {
                                     _player.playOrPause();
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(SnackBar(
+                                      content: Text('Yay! A SnackBar!'),
+                                    ));
                                     HapticFeedback.lightImpact();
                                   },
                                 ),
@@ -652,12 +656,6 @@ class MainRouteState extends State<MainRoute> {
                                   iconSize: 40,
                                   icon: new Icon(Icons.skip_next),
                                   onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (c) =>
-                                              const SettingsRoute()),
-                                    );
                                     _player.skipNext();
                                     HapticFeedback.lightImpact();
                                   },
@@ -682,7 +680,7 @@ class MainRouteState extends State<MainRoute> {
                 )) //Text("Player here", style: new TextStyle(fontSize: 16),)
             ,
             body: _vs == PlayContext.playlist
-                ? ListView.builder(
+                ? ScrollablePositionedList.builder(
                     itemCount: _tracks.length,
                     itemBuilder: (BuildContext context, int index) {
                       return new TrackItem(_tracks[index], index, this);
@@ -698,7 +696,9 @@ class MainRouteState extends State<MainRoute> {
                       //print(notification.metrics.pixels);
                       return true;
                     },
-                    child: ListView.builder(
+                    child: ScrollablePositionedList.builder(
+                        itemScrollController: itemScrollController,
+                        itemPositionsListener: itemPositionsListener,
                         itemCount: _trackCount,
                         itemBuilder: (context, index) {
                           if (_hasTrack(index)) {
@@ -761,16 +761,12 @@ class TrackItem extends StatelessWidget {
   final index;
 
   Widget _buildTiles(Track root, BuildContext context) {
-    //return new ListTile(title: new Text(root.title));
-    crt._itemsContexts.add(ItemContext(
-      context: context,
-      id: index,
-    ));
-
     return Container(
         margin: const EdgeInsets.all(0.0),
         decoration: new BoxDecoration(
-          color: ((crt._currentTrack == l.oid && true) &&
+          color: ((crt._currentTrack == l.oid && crt._vs == PlayContext.all ||
+                      crt._player.currentIndex == index &&
+                          crt._vs == PlayContext.playlist) &&
                   crt._playingPlayList.id == crt._currentPlayList.id)
               ? Colors.blue[300]
               : index % 2 == 1
