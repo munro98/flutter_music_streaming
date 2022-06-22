@@ -14,9 +14,9 @@ class Track {
   Track(String this.name, String this.id, String this.file_path,
       {String this.artist = "",
       String this.artists = "",
-      bool this.is_active = true,
-      bool this.is_missing = false,
-      bool this.is_downloaded = false,
+      int this.is_active = 1,
+      int this.is_missing = 0,
+      int this.is_downloaded = 0,
       int this.play_count = 0,
       int this.track = 0,
       int this.track_of = 0,
@@ -38,9 +38,9 @@ class Track {
   String id; // mongoID
   String? oid; // sqliteID
   int? playlist_index;
-  bool is_active;
-  bool is_downloaded;
-  bool? is_missing;
+  int is_active;
+  int is_downloaded;
+  int? is_missing;
   int? play_count;
   DateTime? release_date;
   DateTime? added_date;

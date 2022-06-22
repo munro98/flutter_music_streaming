@@ -4,13 +4,19 @@ import 'dart:collection';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'package:sqflite_common/sqlite_api.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+//import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
+
 import 'Track.dart';
 import 'Player.dart';
 
 class AppDatabase {
   static Future<Database>? database;
+  static DatabaseFactory? databaseFactory;
 
   static Future<void> openConnection() async {
+    /*
     database = openDatabase(
       // Set the path to the database. Note: Using the `join` function from the
       // `path` package is best practice to ensure the path is correctly
@@ -28,9 +34,20 @@ class AppDatabase {
       // path to perform database upgrades and downgrades.
       version: 2,
     );
+    */
 
-    // "CREATE TABLE playlist(id BINARY(12) PRIMARY KEY, name TEXT, description TEXT, created_at TEXT, store_locally BOOL)"
-    // // "CREATE TABLE playlist_item(id BINARY(12) PRIMARY KEY, track_id BINARY(12), is_active BOOL, added_at TEXT)"
+    ///*
+    var databaseFactory = databaseFactoryFfi;
+    database = databaseFactory.openDatabase(inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+            version: 1,
+            onCreate: (Database db, int version) async {
+              await db.execute(
+                "CREATE TABLE track(id BINARY(12) PRIMARY KEY, name TEXT collate nocase, file_path TEXT UNIQUE, artist TEXT collate nocase, release_date TEXT, added_date TEXT, last_played_date TEXT, year INT, genre TEXT, artists TEXT, is_active BOOL, is_missing BOOL, is_downloaded BOOL, play_count INT, track INT, track_of INT, disk INT, disk_of INT, album TEXT, duration INT, size INT, format TEXT)",
+              );
+            }));
+
+    //*/
   }
 
   static Future<void> insertTrack(Track track) async {

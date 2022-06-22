@@ -16,13 +16,30 @@ import 'package:path/path.dart' as path_lib;
 import 'dart:isolate';
 import 'dart:ui';
 
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common/sqlite_api.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+//import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
+import 'package:dart_vlc/dart_vlc.dart' hide Playlist;
+
 import 'MainRoute.dart';
 import 'Settings.dart';
+import 'AppDatabase.dart';
 
 /////////////////////////////////
 const debug = true;
 void main() async {
-  await FlutterDownloader.initialize(debug: debug);
+  if (Platform.isAndroid || Platform.isIOS) {
+    await FlutterDownloader.initialize(debug: debug);
+  }
+  if (Platform.isWindows || Platform.isLinux) {
+    // Initialize FFI
+    sqfliteFfiInit();
+    DartVLC.initialize();
+  }
+  // Change the default factory. On iOS/Android, if not using `sqlite_flutter_lib` you can forget
+  // this step, it will use the sqlite version available on the system.
+  databaseFactory = databaseFactoryFfi;
   runApp(MyApp());
 }
 

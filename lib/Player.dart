@@ -16,7 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:dart_vlc/dart_vlc.dart' hide Playlist;
+import 'package:dart_vlc/dart_vlc.dart' as VLC hide Playlist;
 
 import 'Track.dart';
 
@@ -52,6 +52,7 @@ class Player {
   late MainRouteState crt;
 
   AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
+  VLC.Player? vlcPlayer;
 
   Playlist? currentPlaylist;
   PlayContext _playContext = PlayContext.all;
@@ -78,6 +79,10 @@ class Player {
   bool ignoreStop = false;
 
   void init(Playlist playlist) {
+    if (Platform.isLinux || Platform.isWindows) {
+      vlcPlayer = VLC.Player(id: 69420, commandlineArguments: ['--no-video']);
+    }
+
     currentPlaylist = playlist;
 
     assetsAudioPlayer.showNotification = true;
@@ -102,6 +107,29 @@ class Player {
           skipNext();
         }
       }
+
+      vlcPlayer?.playbackStream.listen((VLC.PlaybackState state) {
+        //state.isPlaying;
+        //state.isSeekable;
+        //state.isCompleted;
+        if (state.isCompleted) {
+          print("VLCPlayer: music finished play");
+          if (!ignoreStop) {
+            skipNext();
+          }
+        } else if (state.isPlaying) {
+          print("VLCPlayer: music playing");
+        }
+      });
+
+      vlcPlayer?.currentStream.listen((VLC.CurrentState state) {
+        //state.index;
+        //state.media;
+        //state.medias;
+        //state.isPlaylist;
+        //if (state.media) {
+        //}
+      });
 
       _permissionReady = false;
       _isLoading = true;
@@ -312,7 +340,11 @@ class Player {
   }
 
   void playOrPause() {
-    assetsAudioPlayer.playOrPause();
+    if (Platform.isAndroid || Platform.isIOS) {
+      assetsAudioPlayer.playOrPause();
+    } else if (Platform.isWindows || Platform.isLinux) {
+      vlcPlayer?.playOrPause();
+    }
   }
 
   Future<String> prepTrackDir(Track track) async {
@@ -394,7 +426,9 @@ class Player {
         }
       }
     } else if (Platform.isIOS) {
-    } else if (Platform.isWindows || Platform.isMacOS) {}
+    } else if (Platform.isWindows || Platform.isLinux) {
+      playStream(t);
+    }
   }
 
   void playStream(Track track) async {
@@ -406,16 +440,16 @@ class Player {
         await assetsAudioPlayer
             .open(Audio.network(Settings.urlHTTP + "/api/track/" + track.id));
 
-        //assetsAudioPlayer.open(
-        //  Audio("assets/DROELOE - Taking Flight.flac"),
-        //);
-
         print('Player.playStream: playing!');
       } catch (t) {
         print('Player.playStream: could not play!');
       }
     } else if (Platform.isIOS) {
-    } else if (Platform.isWindows) {}
+    } else if (Platform.isWindows || Platform.isWindows) {
+      final media =
+          VLC.Media.network(Settings.urlHTTP + "/api/track/" + track.id);
+      vlcPlayer?.open(media, autoStart: true);
+    }
   }
 
   void playFile(Track track) async {
@@ -423,15 +457,10 @@ class Player {
 
     if (Platform.isAndroid) {
       try {
-        //assetsAudioPlayer.stop();
-
         var externalStorageDirPath =
             await AndroidPathProvider.musicPath + "/Whale Music";
 
-        //final bytes = await readBytes(Uri.parse("kUrl1"));
         final file = File('${externalStorageDirPath}/${track.file_path}');
-
-        //await file.writeAsBytes(bytes);
         if (file.existsSync()) {
           await assetsAudioPlayer.open(Audio.network(file.path));
           print('Player.playFile: playing!');
@@ -452,32 +481,24 @@ class Player {
 
   void skipNext() async {
     print('Player.skipNext:');
-    if (Platform.isAndroid) {
-      try {
-        Track t = await getNextTrack();
+    try {
+      Track t = await getNextTrack();
 
-        print('Player.skip_next: ' + t.file_path);
-        crt.setCurrentTrack(t);
-        play(
-            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
-      } catch (e) {
-        print('Player.skip_next: error' + e.toString());
-      }
-    } else if (Platform.isIOS) {
-    } else if (Platform.isWindows || Platform.isMacOS) {}
+      print('Player.skip_next: ' + t.file_path);
+      crt.setCurrentTrack(t);
+      play(t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
+    } catch (e) {
+      print('Player.skip_next: error' + e.toString());
+    }
   }
 
   void skipPrev() async {
     print('Player.skipPrev:');
-    if (Platform.isAndroid) {
-      try {
-        Track t = await getPrevTrack();
-        crt.setCurrentTrack(t);
-        play(
-            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
-      } catch (e) {}
-    } else if (Platform.isIOS) {
-    } else if (Platform.isWindows || Platform.isMacOS) {}
+    try {
+      Track t = await getPrevTrack();
+      crt.setCurrentTrack(t);
+      play(t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
+    } catch (e) {}
   }
 
   void setShuffleMode(bool shuffleMode) {

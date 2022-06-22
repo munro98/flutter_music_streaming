@@ -45,14 +45,15 @@ class Api {
   */
 
   static Future<List<String>> fetchPlaylistsTracks(String id) async {
-    print("fetching playlists");
+    print("API.fetchPlaylistsTracks:");
 
     final httpRequest =
         await http.get(Uri.http(Settings.url, 'api/playlist/' + id));
 
     List<String> tracks = [];
 
-    if (httpRequest.statusCode != HttpStatus.OK) {
+    if (httpRequest.statusCode != HttpStatus.ok) {
+      throw Exception("Error http " + httpRequest.statusCode.toString());
       return tracks;
     }
 
@@ -70,16 +71,14 @@ class Api {
 
   static Future<List<Track>> fetchTracks(
       String permalink, String sortOrder) async {
-    print("fetching tracks");
+    print("API:fetchTracks " + Settings.url);
     //Client.userAgent = "testApp";
 
     final httpRequest = await http.get(Uri.http(Settings.url, 'api/track'));
-
-    //final httpResponse = await httpRequest.close();
-
     List<Track> tracks = <Track>[];
 
-    if (httpRequest.statusCode != HttpStatus.OK) {
+    if (httpRequest.statusCode != HttpStatus.ok) {
+      throw Exception("Error http " + httpRequest.statusCode.toString());
       return tracks;
     }
 
@@ -108,15 +107,15 @@ class Api {
   }
 
   static Future<List<Playlist>> fetchPlaylists() async {
-    print("fetching playlists");
+    print("API.fetchPlaylists:");
     //Client.userAgent = "testApp";
 
     final httpRequest = await http.get(Uri.http(Settings.url, 'api/playlist'));
 
     List<Playlist> playlist = <Playlist>[];
 
-    if (httpRequest.statusCode != HttpStatus.OK) {
-      throw Exception("No connection");
+    if (httpRequest.statusCode != HttpStatus.ok) {
+      throw Exception("Error http " + httpRequest.statusCode.toString());
       return playlist;
     }
 
@@ -131,7 +130,7 @@ class Api {
   }
 
   static Future<String> f(String id) async {
-    print("fetching playlists");
+    print("API.fetchPlaylistTracks:");
     //Client.userAgent = "testApp";
 
     final httpRequest =
@@ -140,6 +139,7 @@ class Api {
     List<Playlist> playlist = <Playlist>[];
 
     if (httpRequest.statusCode != HttpStatus.OK) {
+      throw Exception("Error http " + httpRequest.statusCode.toString());
       return "";
     }
 

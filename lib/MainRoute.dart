@@ -31,7 +31,6 @@ import 'Settings.dart';
 todo
 
 dragable seekbar
-shuffle playing for playlists
 fix added_date sort order
 
 add windows support with vlc_player for music and 
@@ -139,7 +138,10 @@ class MainRouteState extends State<MainRoute> {
       setState(() {});
     });
 
-    FlutterDownloader.registerCallback(downloadCallback);
+    if (Platform.isAndroid || Platform.isIOS) {
+      FlutterDownloader.registerCallback(downloadCallback);
+    }
+
     AppDatabase.openConnection()
         .then((value) => loadPlaylist(_currentPlayList, _sortOrder));
 
@@ -149,10 +151,9 @@ class MainRouteState extends State<MainRoute> {
 
     _player.assetsAudioPlayer.current.listen((playing) {
       //final path = playing?.audio.path;
+      // Set duration and start seekbar from begining
       final songDuration = playing?.audio.duration;
       _seekKey.currentState?.setDurationValue(songDuration!);
-      //_seekKey.currentState?.reset();
-
       _seekKey.currentState?.setProgressValue(0.0);
 
       print("song duration " + songDuration.toString());
@@ -779,7 +780,7 @@ class TrackItem extends StatelessWidget {
                 height: 40.0,
                 width: 40.0,
                 child: Checkbox(
-                    value: l.is_active,
+                    value: l.is_active == 1,
                     onChanged: (b) {
                       //l.is_active = b as bool;
                     })),
