@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 //import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
+import 'FileUtil.dart';
 
 import 'Track.dart';
 import 'Player.dart';
@@ -38,7 +39,9 @@ class AppDatabase {
 
     ///*
     var databaseFactory = databaseFactoryFfi;
-    database = databaseFactory.openDatabase(inMemoryDatabasePath,
+    database = databaseFactory.openDatabase(
+        join(await FileUtil.getAppDocDir("/Whale Music"),
+            'music_library2.db'), //inMemoryDatabasePath,
         options: OpenDatabaseOptions(
             version: 1,
             onCreate: (Database db, int version) async {

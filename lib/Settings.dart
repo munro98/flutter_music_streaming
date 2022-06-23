@@ -16,6 +16,8 @@ import 'widgets/TextFieldInput.dart';
 
 class Settings {
   static String url = "192.168.0.105:3000";
+  static String user = "";
+  static String password = "";
 
   // must be set when changing the url
   static String urlHTTP = "http://192.168.0.105:3000";
@@ -46,17 +48,17 @@ class SettingsRouteState extends State<SettingsRoute> {
       String? urlS = prefs.getString('url');
       if (urlS != null) {
         _urlController.text = urlS;
-        //Settings.url = urlS;
+        Settings.url = urlS;
       }
       String? userS = prefs.getString('user');
       if (userS != null) {
         _userController.text = userS;
-        //Settings.user = userS;
+        Settings.user = userS;
       }
       String? passwordS = prefs.getString('password');
       if (passwordS != null) {
         _passwordController.text = passwordS;
-        //Settings.password = passwordS;
+        Settings.password = passwordS;
       }
     });
 

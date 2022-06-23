@@ -21,13 +21,14 @@ class SeekBar extends StatefulWidget {
 /// This is the private State class that goes with SeekBar.
 /// AnimationControllers can be created with `vsync: this` because of TickerProviderStateMixin.
 class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
-  late AnimationController controller;
+  //late AnimationController controller;
 
   final MainRouteState crt;
-  double progressBarValue = 0.0;
+  double progressValue = 0.0;
 
   SeekBarState(this.crt);
 
+  /*
   void reset() {
     controller.reset();
   }
@@ -39,60 +40,41 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
   void resume() {
     controller.forward(from: controller.value);
   }
+  */
 
   void setProgressValue(double val) {
     this.setState(() {
-      controller.value = val;
+      //controller.value = val;
     });
-    controller.forward(from: val);
+    //controller.forward(from: val);
   }
 
   void setProgressDuration(Duration duration) {
+    /*
     this.setState(() {
       var a = ((duration.inMilliseconds as double) /
           (controller.duration?.inMilliseconds as double)) as double;
       controller.value = a;
     });
+    */
   }
 
   void setDurationValue(Duration duration) {
+    /*
     this.setState(() {
       controller.duration = duration;
     });
-  }
-
-  void setRepeat(Duration duration) {
-    //_beginOffset = _endOffset;
-    //_endOffset = _endOffset + _animationOffset;
-
-    setState(() {
-      //_characterPosition = _generateCharacterPosition();
-      controller.value = 0.5;
-    });
-    //controller.reset();
-    //controller.duration = const Duration(seconds: 120);
-    //controller.repeat(min: 0, max: 1, reverse: false);
-    controller.forward(from: 0.5);
-    //initState();
+    */
   }
 
   @override
   void initState() {
-    controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 120),
-    )..addListener(() {
-        setState(() {});
-      });
-    //controller.
-    controller.repeat(min: 0, max: 1, reverse: false);
-    //controller.
     super.initState();
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    //controller.dispose();
     super.dispose();
   }
 
@@ -104,11 +86,18 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
         //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          LinearProgressIndicator(
-            value: controller
-                .value, //crt._player.assetsAudioPlayer.currentPosition.inSeconds.toDouble() / crt._player.assetsAudioPlayer.duration.inSeconds.toDouble()
-            semanticsLabel: 'Linear progress indicator',
-          ),
+          Slider(
+            value: progressValue,
+            min: 0,
+            max: 1,
+            //divisions: 5,
+            //label: progressValue.round().toString(),
+            onChanged: (double value) {
+              setState(() {
+                progressValue = value;
+              });
+            },
+          )
         ],
       ),
     );

@@ -21,7 +21,10 @@ class FileUtil {
   }
 
   static Future<bool> _checkPermission() async {
-    if (Platform.isIOS) return true;
+    if (Platform.isIOS ||
+        Platform.isWindows ||
+        Platform.isLinux ||
+        Platform.isMacOS) return true;
 
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
@@ -49,7 +52,10 @@ class FileUtil {
       if (Platform.isAndroid) {
         appDocPath =
             await AndroidPathProvider.musicPath + "/Whale Music" + filePath;
-      } else if (Platform.isIOS) {
+      } else if (Platform.isIOS ||
+          Platform.isWindows ||
+          Platform.isLinux ||
+          Platform.isMacOS) {
         appDocPath = (await getApplicationDocumentsDirectory()).absolute.path +
             "/Whale Music" +
             filePath;
@@ -82,7 +88,7 @@ class FileUtil {
     return trackDir;
   }
 
-  static Future<String?> getAppDocDir(String filePath) async {
+  static Future<String> getAppDocDir(String filePath) async {
     if (!_permissionReady) {
       _permissionReady = await _preparePermissions();
     }

@@ -69,7 +69,7 @@ class Choice {
 
 const List<Choice> choices = const <Choice>[
   const Choice('Refresh', Icons.directions_car),
-  const Choice('Download Playlist Data', Icons.directions_boat),
+  const Choice('Download Playlist Data', Icons.heart_broken),
   const Choice('Download Tracks in Playlist', Icons.directions_bus),
   const Choice('Open Settings', Icons.directions_bus),
 ];
@@ -159,6 +159,18 @@ class MainRouteState extends State<MainRoute> {
       print("song duration " + songDuration.toString());
     });
 
+    _player.assetsAudioPlayer.currentPosition.listen(
+        ((duration) => {_seekKey.currentState?.setProgressDuration(duration)}));
+
+    _player.vlcPlayer?.positionStream.listen((position) {
+      //this.setState(() => this.position = position);
+      _seekKey.currentState?.setProgressDuration(position.duration!);
+    });
+
+    _player.vlcPlayer?.playbackStream.listen((playback) {
+      //this.setState(() => this.playback = playback);
+    });
+
     print(" initState" + _tracks.length.toString());
   }
 
@@ -170,11 +182,11 @@ class MainRouteState extends State<MainRoute> {
   }
 
   void playerPausedCallback() {
-    _seekKey.currentState?.stop();
+    //_seekKey.currentState?.stop();
   }
 
   void playerPlayCallback() {
-    _seekKey.currentState?.resume();
+    //_seekKey.currentState?.resume();
   }
 
   static void downloadCallback(
