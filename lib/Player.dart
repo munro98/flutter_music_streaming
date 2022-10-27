@@ -6,25 +6,23 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
-import 'package:flutter_music_app/AppDatabase.dart';
-import 'package:flutter_music_app/Settings.dart';
+
 import 'package:http/http.dart';
 import 'package:path/path.dart' as path_lib;
 
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
+import 'package:dart_vlc/dart_vlc.dart' as VLC hide Playlist;
+
 import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:dart_vlc/dart_vlc.dart' as VLC hide Playlist;
 
+import 'Settings.dart';
 import 'Track.dart';
-
 import 'AppDatabase.dart';
 import 'API.dart';
-import 'Playlist.dart';
-
 import 'Playlist.dart';
 import 'MainRoute.dart';
 import 'FileUtil.dart';
@@ -46,7 +44,7 @@ enum SortOrder {
 enum LoopMode { none, one, all }
 
 class Player {
-  static int maxShufflePlayed = 16;
+  static int maxShufflePlayed = 32;
 
   Player(MainRouteState crt) {
     this.crt = crt;
@@ -117,7 +115,7 @@ class Player {
         } else if (assetsAudioPlayer.playerState.value == PlayerState.stop) {
           print("Player: music finished stopped");
           if (!ignoreStop) {
-            skipNext();
+            skipNext(false);
           }
         }
         //if (assetsAudioPlayer.isPlaying.value) {
@@ -134,7 +132,7 @@ class Player {
         if (state.isCompleted) {
           print("VLCPlayer: music finished play");
           if (!ignoreStop) {
-            skipNext();
+            skipNext(false);
           }
         } else if (state.isPlaying) {
           print("VLCPlayer: music playing");
@@ -252,10 +250,17 @@ class Player {
     }
   }
 
-  Future<Track> getNextTrack() async {
+  Future<Track?> getNextTrack(bool userInvoked) async {
     Track c = current as Track;
 
     if (current != null) {
+      if (loopMode == LoopMode.one) {
+        if (userInvoked) {
+          this.loopMode = LoopMode.all;
+          crt.setLoopModeCallback(this.loopMode);
+        }
+        return current;
+      }
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {
           print("oid " + currentPlaylist!.id);
@@ -311,9 +316,17 @@ class Player {
     throw Exception();
   }
 
-  Future<Track> getPrevTrack() async {
+  Future<Track?> getPrevTrack(bool userInvoked) async {
     Track c = current as Track;
     if (current != null) {
+      if (loopMode == LoopMode.one) {
+        if (userInvoked) {
+          this.loopMode = LoopMode.all;
+          crt.setLoopModeCallback(this.loopMode);
+        }
+
+        return current;
+      }
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {
           if (current != null) {
@@ -506,26 +519,33 @@ class Player {
     } else if (Platform.isWindows) {}
   }
 
-  void skipNext() async {
+  void skipNext(bool userInvoked) async {
     print('Player.skipNext:');
     try {
-      Track t = await getNextTrack();
-
-      print('Player.skip_next: ' + t.file_path);
-      crt.setCurrentTrack(t);
-      play(t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
+      Track? t = await getNextTrack(userInvoked);
+      if (t != null) {
+        print('Player.skip_next: ' + t.file_path);
+        crt.setCurrentTrack(t);
+        play(
+            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
+      }
     } catch (e) {
       print('Player.skip_next: error' + e.toString());
     }
   }
 
-  void skipPrev() async {
+  void skipPrev(bool userInvoked) async {
     print('Player.skipPrev:');
+    Track? t = await getPrevTrack(userInvoked);
     try {
-      Track t = await getPrevTrack();
-      crt.setCurrentTrack(t);
-      play(t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
-    } catch (e) {}
+      if (t != null) {
+        crt.setCurrentTrack(t);
+        play(
+            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
+      }
+    } catch (e) {
+      print('Player.skip_prev: error' + e.toString());
+    }
   }
 
   void setShuffleMode(bool shuffleMode) {

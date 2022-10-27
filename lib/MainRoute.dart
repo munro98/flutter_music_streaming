@@ -676,7 +676,7 @@ class MainRouteState extends State<MainRoute> {
                                   iconSize: 40,
                                   icon: new Icon(Icons.skip_previous),
                                   onPressed: () {
-                                    _player.skipPrev();
+                                    _player.skipPrev(true);
                                     HapticFeedback.lightImpact();
                                   },
                                 ),
@@ -698,7 +698,7 @@ class MainRouteState extends State<MainRoute> {
                                   iconSize: 40,
                                   icon: new Icon(Icons.skip_next),
                                   onPressed: () {
-                                    _player.skipNext();
+                                    _player.skipNext(true);
                                     HapticFeedback.lightImpact();
                                   },
                                 ),
@@ -797,6 +797,12 @@ class MainRouteState extends State<MainRoute> {
 
   void updateSeekBar(double fraction) {
     _seekKey.currentState?.setValue(fraction);
+  }
+
+  void setLoopModeCallback(LoopMode loopMode) {
+    this.setState(() {
+      this._loopMode = loopMode;
+    });
   }
 }
 
