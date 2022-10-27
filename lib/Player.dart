@@ -89,7 +89,7 @@ class Player {
 
     currentPlaylist = playlist;
 
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       // Audio Assets initialization
       assetsAudioPlayer.showNotification = true;
       assetsAudioPlayer.playerState.listen((event) {
@@ -363,7 +363,7 @@ class Player {
   }
 
   void playOrPause() {
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       assetsAudioPlayer.playOrPause();
     } else if (Platform.isWindows || Platform.isLinux) {
       vlcPlayer?.playOrPause();
@@ -457,7 +457,7 @@ class Player {
   void playStream(Track track) async {
     current = track;
 
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       try {
         //assetsAudioPlayer.stop();
         await assetsAudioPlayer
@@ -479,6 +479,7 @@ class Player {
     current = track;
 
     if (Platform.isAndroid) {
+      // TODO
       try {
         var externalStorageDirPath =
             await AndroidPathProvider.musicPath + "/Whale Music";
@@ -540,7 +541,12 @@ class Player {
       Duration newD = d! * value;
       assetsAudioPlayer.seek(newD);
       //print(d);
-    } else if (Platform.isWindows) {}
+    } else if (Platform.isLinux || Platform.isWindows) {
+      Duration? d = vlcPlayer?.position.duration;
+      Duration newD = d! * value;
+      vlcPlayer?.seek(newD);
+      //print("new" + newD.toString());
+    }
   }
 
   void setLoopMode(LoopMode loopMode) {
