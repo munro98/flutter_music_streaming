@@ -138,6 +138,9 @@ class Player {
           }
         } else if (state.isPlaying) {
           print("VLCPlayer: music playing");
+          crt.playerPlayCallback();
+        } else {
+          crt.playerPausedCallback();
         }
       });
 

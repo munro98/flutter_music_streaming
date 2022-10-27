@@ -121,6 +121,7 @@ class MainRouteState extends State<MainRoute> {
   bool _showSearchBar = false;
   bool _shuffleMode = false;
   LoopMode _loopMode = LoopMode.none;
+  bool _isPlaying = false;
   bool _isConnected = false;
 
   GlobalKey<SeekBarState> _seekKey = GlobalKey();
@@ -188,11 +189,15 @@ class MainRouteState extends State<MainRoute> {
   }
 
   void playerPausedCallback() {
-    //_seekKey.currentState?.stop();
+    this.setState(() {
+      _isPlaying = false;
+    });
   }
 
   void playerPlayCallback() {
-    //_seekKey.currentState?.resume();
+    this.setState(() {
+      _isPlaying = true;
+    });
   }
 
   static void downloadCallback(
@@ -677,7 +682,9 @@ class MainRouteState extends State<MainRoute> {
                                 ),
                                 new IconButton(
                                   iconSize: 60,
-                                  icon: new Icon(Icons.play_arrow),
+                                  icon: _isPlaying
+                                      ? new Icon(Icons.play_arrow)
+                                      : new Icon(Icons.pause_sharp),
                                   onPressed: () {
                                     _player.playOrPause();
                                     /* ScaffoldMessenger.of(context)
