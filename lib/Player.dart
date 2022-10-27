@@ -41,7 +41,7 @@ enum SortOrder {
   playlist_desc
 }
 
-enum LoopMode { none, one, all }
+enum LoopMode { none, all, one }
 
 class Player {
   static int maxShufflePlayed = 32;
@@ -185,8 +185,9 @@ class Player {
         if (userInvoked) {
           this.loopMode = LoopMode.all;
           crt.setLoopModeCallback(this.loopMode);
+        } else {
+          return current;
         }
-        return current;
       }
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {
@@ -250,9 +251,9 @@ class Player {
         if (userInvoked) {
           this.loopMode = LoopMode.all;
           crt.setLoopModeCallback(this.loopMode);
+        } else {
+          return current;
         }
-
-        return current;
       }
       if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
         if (!isShuffle) {

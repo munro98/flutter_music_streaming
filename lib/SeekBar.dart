@@ -81,24 +81,29 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4.0, 0.0, 4.0, 0.0),
+      padding: const EdgeInsets.fromLTRB(10.0, 0.0, 10.0, 0.0),
       child: Column(
         //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Slider(
-            value: progressValue,
-            min: 0,
-            max: 1,
-            //divisions: 5,
-            //label: progressValue.round().toString(),
-            onChanged: (double value) {
-              crt.seek(value);
-              setState(() {
-                progressValue = value;
-              });
-            },
-          )
+          SliderTheme(
+              data: SliderThemeData(
+                  trackHeight: 8,
+                  trackShape: CustomTrackShape(),
+                  overlayShape: SliderComponentShape.noOverlay),
+              child: Slider(
+                value: progressValue,
+                min: 0,
+                max: 1,
+                //divisions: 5,
+                //label: progressValue.round().toString(),
+                onChanged: (double value) {
+                  crt.seek(value);
+                  setState(() {
+                    progressValue = value;
+                  });
+                },
+              ))
         ],
       ),
     );
@@ -109,5 +114,22 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
     setState(() {
       progressValue = fraction;
     });
+  }
+}
+
+class CustomTrackShape extends RoundedRectSliderTrackShape {
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final double? trackHeight = sliderTheme.trackHeight;
+    final double trackLeft = offset.dx;
+    final double trackTop =
+        offset.dy + (parentBox.size.height - trackHeight!) / 1;
+    final double trackWidth = parentBox.size.width;
+    return Rect.fromLTWH(trackLeft, trackTop, trackWidth, trackHeight);
   }
 }
