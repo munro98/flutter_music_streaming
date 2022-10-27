@@ -32,13 +32,13 @@ import 'widgets/TextFieldInput.dart';
 todo
 
 search filter
-add to queue
+add to queue queing system
 
-dragable seekbar
 fix added_date sort order
 
-add windows support with vlc_player for music and 
 sqflite_common_ffi for database
+windows downloading
+macos downloading
 
 add settings menu and able to edit server ip
 
@@ -503,10 +503,13 @@ class MainRouteState extends State<MainRoute> {
                         children: <Widget>[
                           new Expanded(
                               child: InkWell(
-                            child: Row(
+                            child: Container(
+                                child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('Title'),
+                                Align(
+                                    alignment: Alignment.center,
+                                    child: Text('Title')),
                                 _sortOrder == SortOrder.name ||
                                         _sortOrder == SortOrder.name_desc
                                     ? _sortOrder == SortOrder.name
@@ -514,7 +517,7 @@ class MainRouteState extends State<MainRoute> {
                                         : Icon(Icons.arrow_drop_up)
                                     : Container()
                               ],
-                            ),
+                            )),
                             onTap: () {
                               if (_sortOrder == SortOrder.name) {
                                 loadPlaylist(
@@ -529,7 +532,9 @@ class MainRouteState extends State<MainRoute> {
                             child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('Artist'),
+                                  Align(
+                                      alignment: Alignment.center,
+                                      child: Text('Artist')),
                                   _sortOrder == SortOrder.artist ||
                                           _sortOrder == SortOrder.artist_desc
                                       ? _sortOrder == SortOrder.artist
@@ -553,7 +558,9 @@ class MainRouteState extends State<MainRoute> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Text('Date'),
+                                        Align(
+                                            alignment: Alignment.center,
+                                            child: Text('Date')),
                                         _sortOrder == SortOrder.added ||
                                                 _sortOrder ==
                                                     SortOrder.added_desc
@@ -577,7 +584,9 @@ class MainRouteState extends State<MainRoute> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Text('Playlist'),
+                                        Align(
+                                            alignment: Alignment.center,
+                                            child: Text('Playlist')),
                                         _sortOrder == SortOrder.playlist ||
                                                 _sortOrder ==
                                                     SortOrder.playlist_desc
