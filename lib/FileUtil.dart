@@ -16,15 +16,15 @@ class FileUtil {
   static bool _isLoading = true;
   //static late String _localPath;
 
-  static Future<bool> _preparePermissions() async {
-    return await _checkPermission();
+  static Future<bool> preparePermissions() async {
+    return await checkPermission();
   }
 
-  static Future<bool> _checkPermission() async {
+  static Future<bool> checkPermission() async {
     if (Platform.isIOS ||
         Platform.isWindows ||
         Platform.isLinux ||
-        Platform.isMacOS) return true;
+        Platform.isMacOS) return true; // TODO:
 
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
@@ -44,7 +44,7 @@ class FileUtil {
 
   static Future<String?> getAppMusicDir(String filePath) async {
     if (!_permissionReady) {
-      _permissionReady = await _preparePermissions();
+      _permissionReady = await preparePermissions();
     }
 
     try {
@@ -90,7 +90,7 @@ class FileUtil {
 
   static Future<String> getAppDocDir(String filePath) async {
     if (!_permissionReady) {
-      _permissionReady = await _preparePermissions();
+      _permissionReady = await preparePermissions();
     }
 
     Directory appDocDir = await getApplicationDocumentsDirectory();

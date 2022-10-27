@@ -1,4 +1,4 @@
-# flutter_music_streaming
+# Flutter Music Streaming App
 
 Writing a cross platform streaming music player in flutter.
 

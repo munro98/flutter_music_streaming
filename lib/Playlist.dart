@@ -14,6 +14,7 @@ import 'Track.dart';
 import 'AppDatabase.dart';
 import 'Api.dart';
 import 'FileUtil.dart';
+import 'Settings.dart';
 
 class Playlist {
   Playlist(String this.name, String this.id);
@@ -144,7 +145,7 @@ class PlaylistManager {
   static void download(Track track, String appMusicPath) async {
     var saveDir = await FileUtil.prepTrackDir(track);
 
-    var url = "http://192.168.0.105:3000/api/track/" + track.id;
+    var url = Settings.urlHTTP + "/api/track/" + track.id;
     var id = await FlutterDownloader.enqueue(
       url: url,
       savedDir: saveDir,

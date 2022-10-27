@@ -26,9 +26,13 @@ import 'API.dart';
 import 'Playlist.dart';
 import 'SeekBar.dart';
 import 'Settings.dart';
+import 'widgets/TextFieldInput.dart';
 
 /*
 todo
+
+search filter
+add to queue
 
 dragable seekbar
 fix added_date sort order
@@ -114,12 +118,14 @@ class MainRouteState extends State<MainRoute> {
   int _trackCount = 0;
 
   String _currentTrack = "";
+  bool _showSearchBar = false;
   bool _shuffleMode = false;
   LoopMode _loopMode = LoopMode.none;
   bool _isConnected = false;
 
   GlobalKey<SeekBarState> _seekKey = GlobalKey();
   GlobalKey<ScaffoldState> scaffKey = new GlobalKey<ScaffoldState>();
+  TextEditingController _searchController = TextEditingController();
 
   final ItemScrollController itemScrollController = ItemScrollController();
   final ItemPositionsListener itemPositionsListener =
@@ -304,7 +310,6 @@ class MainRouteState extends State<MainRoute> {
   }
 
   void refreshPlaylists() async {
-    //List<Playlist> playlists = await Api.fetchPlaylists();
     List<Playlist> playlists = await PlaylistManager.fetchPlaylists();
 
     playlists.insert(0, allPlayList);
@@ -597,6 +602,14 @@ class MainRouteState extends State<MainRoute> {
                 ),
                 actions: <Widget>[
                   new IconButton(
+                    icon: new Icon(Icons.search),
+                    onPressed: () async {
+                      this.setState(() {
+                        _showSearchBar = !_showSearchBar;
+                      });
+                    },
+                  ),
+                  new IconButton(
                     icon: new Icon(Icons.refresh),
                     onPressed: () async {
                       refresh();
@@ -658,10 +671,10 @@ class MainRouteState extends State<MainRoute> {
                                   icon: new Icon(Icons.play_arrow),
                                   onPressed: () {
                                     _player.playOrPause();
-                                    ScaffoldMessenger.of(context)
+                                    /* ScaffoldMessenger.of(context)
                                         .showSnackBar(SnackBar(
                                       content: Text('Yay! A SnackBar!'),
-                                    ));
+                                    )); */
                                     HapticFeedback.lightImpact();
                                   },
                                 ),
@@ -692,38 +705,48 @@ class MainRouteState extends State<MainRoute> {
                   color: Colors.grey[400],
                 )) //Text("Player here", style: new TextStyle(fontSize: 16),)
             ,
-            body: _vs == PlayContext.playlist
-                ? ScrollablePositionedList.builder(
-                    itemCount: _tracks.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      return new TrackItem(_tracks[index], index, this);
-                    },
-                  )
-                : NotificationListener<ScrollUpdateNotification>(
-                    onNotification: (notification) {
-                      //_onScroll(notification);
-                      //How many pixels scrolled from pervious frame
-                      //print(notification.scrollDelta);
+            body: Column(children: <Widget>[
+              _showSearchBar
+                  ? TextFieldInput(
+                      textEditingController: _searchController,
+                      hintText: "Search...",
+                      textInputType: TextInputType.name)
+                  : Container(),
+              Expanded(
+                  child: _vs == PlayContext.playlist
+                      ? ScrollablePositionedList.builder(
+                          itemCount: _tracks.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            return new TrackItem(_tracks[index], index, this);
+                          },
+                        )
+                      : NotificationListener<ScrollUpdateNotification>(
+                          onNotification: (notification) {
+                            //_onScroll(notification);
+                            //How many pixels scrolled from pervious frame
+                            //print(notification.scrollDelta);
 
-                      //List scroll position
-                      //print(notification.metrics.pixels);
-                      return true;
-                    },
-                    child: ScrollablePositionedList.builder(
-                        itemScrollController: itemScrollController,
-                        itemPositionsListener: itemPositionsListener,
-                        itemCount: _trackCount,
-                        itemBuilder: (context, index) {
-                          if (_hasTrack(index)) {
-                            return new TrackItem(
-                                _fetchTrack(index), index, this);
-                          } else {
-                            _fetchPage((index ~/ _pageSize).toInt(),
-                                _currentPlayList.id, _sortOrder);
-                            return Center(child: CircularProgressIndicator());
-                          }
-                        }),
-                  )));
+                            //List scroll position
+                            //print(notification.metrics.pixels);
+                            return true;
+                          },
+                          child: ScrollablePositionedList.builder(
+                              itemScrollController: itemScrollController,
+                              itemPositionsListener: itemPositionsListener,
+                              itemCount: _trackCount,
+                              itemBuilder: (context, index) {
+                                if (_hasTrack(index)) {
+                                  return new TrackItem(
+                                      _fetchTrack(index), index, this);
+                                } else {
+                                  _fetchPage((index ~/ _pageSize).toInt(),
+                                      _currentPlayList.id, _sortOrder);
+                                  return Center(
+                                      child: CircularProgressIndicator());
+                                }
+                              }),
+                        ))
+            ])));
   }
 
   void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
@@ -750,6 +773,14 @@ class MainRouteState extends State<MainRoute> {
 
   SortOrder getSortOrder() {
     return this._sortOrder;
+  }
+
+  void seek(double value) {
+    _player.seek(value);
+  }
+
+  void updateSeekBar(double fraction) {
+    _seekKey.currentState?.setValue(fraction);
   }
 }
 

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_music_app/AppDatabase.dart';
 import 'package:flutter_music_app/Settings.dart';
 import 'package:http/http.dart';
@@ -26,6 +27,8 @@ import 'Playlist.dart';
 
 import 'Playlist.dart';
 import 'MainRoute.dart';
+import 'FileUtil.dart';
+import 'Util.dart';
 
 enum PlayContext { all, playlist }
 
@@ -60,6 +63,7 @@ class Player {
 
   Track? current;
   int currentIndex = 0;
+  Duration currentDuration = new Duration();
 
   List<Track> _tracks = [];
   List<Track> _shuffleTracks = [];
@@ -85,28 +89,43 @@ class Player {
 
     currentPlaylist = playlist;
 
-    assetsAudioPlayer.showNotification = true;
-
-    assetsAudioPlayer.playerState.listen((event) {
-      if (event == PlayerState.pause) {
-        print("Player: music pause");
-        crt.playerPausedCallback();
-      } else if (event == PlayerState.play) {
-        print("Player: music play");
-        crt.playerPlayCallback();
-      }
-    });
-
-    assetsAudioPlayer.playlistAudioFinished.listen((Playing playing) {
-      if (assetsAudioPlayer.playerState.value == PlayerState.play) {
-        print("Player: music finished play");
-      } else if (assetsAudioPlayer.playerState.value == PlayerState.pause) {
-      } else if (assetsAudioPlayer.playerState.value == PlayerState.stop) {
-        print("Player: music finished stopped");
-        if (!ignoreStop) {
-          skipNext();
+    if (Platform.isAndroid || Platform.isIOS) {
+      // Audio Assets initialization
+      assetsAudioPlayer.showNotification = true;
+      assetsAudioPlayer.playerState.listen((event) {
+        if (event == PlayerState.pause) {
+          print("Player: music pause");
+          crt.playerPausedCallback();
+        } else if (event == PlayerState.play) {
+          print("Player: music play");
+          crt.playerPlayCallback();
         }
-      }
+      });
+
+      assetsAudioPlayer.currentPosition.listen((event) {
+        currentDuration = event;
+        Duration? trackDuration =
+            assetsAudioPlayer.current.value?.audio.duration;
+        double fraction = event / trackDuration!;
+        crt.updateSeekBar(fraction);
+      });
+
+      assetsAudioPlayer.playlistAudioFinished.listen((Playing playing) {
+        if (assetsAudioPlayer.playerState.value == PlayerState.play) {
+          print("Player: music finished play");
+        } else if (assetsAudioPlayer.playerState.value == PlayerState.pause) {
+        } else if (assetsAudioPlayer.playerState.value == PlayerState.stop) {
+          print("Player: music finished stopped");
+          if (!ignoreStop) {
+            skipNext();
+          }
+        }
+        //if (assetsAudioPlayer.isPlaying.value) {
+        //  skip_next();
+        //}
+      });
+    } else if (Platform.isWindows || Platform.isLinux) {
+      // VLC initialization
 
       vlcPlayer?.playbackStream.listen((VLC.PlaybackState state) {
         //state.isPlaying;
@@ -131,26 +150,29 @@ class Player {
         //}
       });
 
-      _permissionReady = false;
-      _isLoading = true;
-      _prepare();
-      //assetsAudioPlayer.
+      vlcPlayer?.positionStream.listen((position) {
+        //print(position.duration?.inMilliseconds.toString());
+        Duration? trackDuration = position.duration;
+        double fraction = position.position! / trackDuration!;
+        crt.updateSeekBar(fraction);
+      });
+    }
 
-      //if (assetsAudioPlayer.isPlaying.value) {
-      //  skip_next();
-      //}
-    });
+    _permissionReady = false;
+    _isLoading = true;
+
+    FileUtil.preparePermissions();
   }
-
+  /*
   Future<Null> _prepare() async {
-    _permissionReady = await _checkPermission();
+    _permissionReady = await FileUtil.checkPermission();
     if (_permissionReady) {
       await _prepareSaveDir();
     }
 
     _isLoading = false;
   }
-
+  
   Future<bool> _checkPermission() async {
     if (Platform.isIOS) return true;
 
@@ -195,6 +217,7 @@ class Player {
       savedDir.create();
     }
   }
+  */
 
 /*
   void loadPlaylist(Playlist playlist) async {
@@ -348,7 +371,7 @@ class Player {
   }
 
   Future<String> prepTrackDir(Track track) async {
-    String trackLibDir = (await _findLocalPath())!;
+    String trackLibDir = (await FileUtil.getAppMusicDir(""))!;
 
     final dirname = path_lib.dirname(track.file_path);
     final trackDir = path_lib.join(trackLibDir, dirname);
@@ -362,7 +385,7 @@ class Player {
   }
 
   void downloadTrack(Track track) async {
-    _permissionReady = await _checkPermission();
+    _permissionReady = await FileUtil.preparePermissions();
     if (_permissionReady) {
       var saveDir = await prepTrackDir(track);
 
@@ -402,10 +425,10 @@ class Player {
     print("Player.play: " + t.name + ", " + t.oid.toString());
 
     if (Platform.isAndroid) {
-      _permissionReady = await _checkPermission();
+      _permissionReady = await FileUtil.checkPermission();
       if (_permissionReady) {
         //var saveDir = await prepTrackDir(t);
-        String trackLibDir = (await _findLocalPath())!;
+        String trackLibDir = (await FileUtil.getAppMusicDir(""))!;
 
         final dirname = path_lib.dirname(t.file_path);
 
@@ -509,6 +532,15 @@ class Player {
       _shuffleTracks = _tracks;
       _shuffleTracks.shuffle();
     }
+  }
+
+  void seek(double value) {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      Duration? d = assetsAudioPlayer.current.value?.audio.duration;
+      Duration newD = d! * value;
+      assetsAudioPlayer.seek(newD);
+      //print(d);
+    } else if (Platform.isWindows) {}
   }
 
   void setLoopMode(LoopMode loopMode) {

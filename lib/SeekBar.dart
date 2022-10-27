@@ -81,7 +81,7 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10.0, 10.0, 10.0, 4.0),
+      padding: const EdgeInsets.fromLTRB(4.0, 0.0, 4.0, 0.0),
       child: Column(
         //mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         mainAxisSize: MainAxisSize.min,
@@ -93,6 +93,7 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
             //divisions: 5,
             //label: progressValue.round().toString(),
             onChanged: (double value) {
+              crt.seek(value);
               setState(() {
                 progressValue = value;
               });
@@ -101,5 +102,12 @@ class SeekBarState extends State<SeekBar> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+
+  void setValue(double fraction) {
+    if (fraction.isNaN) return;
+    setState(() {
+      progressValue = fraction;
+    });
   }
 }
