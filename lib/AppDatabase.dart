@@ -41,12 +41,12 @@ class AppDatabase {
     var databaseFactory = databaseFactoryFfi;
     database = databaseFactory.openDatabase(
         join(await FileUtil.getAppDocDir("/Whale Music"),
-            'music_library2.db'), //inMemoryDatabasePath,
+            'music_library3.db'), //inMemoryDatabasePath,
         options: OpenDatabaseOptions(
             version: 1,
             onCreate: (Database db, int version) async {
               await db.execute(
-                "CREATE TABLE track(id BINARY(12) PRIMARY KEY, name TEXT collate nocase, file_path TEXT UNIQUE, artist TEXT collate nocase, release_date TEXT, added_date TEXT, last_played_date TEXT, year INT, genre TEXT, artists TEXT, is_active BOOL, is_missing BOOL, is_downloaded BOOL, play_count INT, track INT, track_of INT, disk INT, disk_of INT, album TEXT, duration INT, size INT, format TEXT)",
+                "CREATE TABLE track(id BINARY(12) PRIMARY KEY, name TEXT collate nocase, file_path TEXT UNIQUE, artist TEXT collate nocase, release_date TEXT, added_date TEXT, last_played_date TEXT, year INT, genre TEXT, artists TEXT, is_active BOOL, is_missing BOOL, is_downloaded BOOL, play_count INT, track INT, track_of INT, disk INT, disk_of INT, album TEXT, duration INT, size INT, format TEXT, search_keys TEXT)",
               );
             }));
 
@@ -134,6 +134,116 @@ class AppDatabase {
                 offset.toString() +
                 ' )ORDER BY oid ASC LIMIT ' +
                 _limit.toString());
+      } else if (sortOrder == SortOrder.playlist_desc) {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid DESC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == SortOrder.name) {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY name ASC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == SortOrder.name_desc) {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY name DESC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == SortOrder.artist) {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY artist ASC, name ASC LIMIT ' +
+                _limit.toString());
+      } else if (sortOrder == SortOrder.artist_desc) {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY name ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY artist DESC, name DESC LIMIT ' +
+                _limit.toString());
+      } else {
+        maps = await db.rawQuery(
+            'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
+                offset.toString() +
+                ' )ORDER BY oid ASC LIMIT ' +
+                _limit.toString());
+      }
+
+      List<Track> tracks = List.generate(maps.length, (i) {
+        return Track(
+          maps[i]['name'],
+          maps[i]['id'],
+          maps[i]['file_path'],
+          artist: maps[i]['artist'],
+          oid: maps[i]['oid'].toString(),
+        );
+      });
+
+      print("fetching tracks " + tracks.length.toString());
+
+      for (int i = 0; i < tracks.length; i++) {
+        // WHAT: HOW DOES THIS EVEN WORK!!!!????
+        tracks[i].oid = maps[i]['oid'].toString();
+
+        if (maps[i]['added_date'] != null) {
+          tracks[i].added_date = maps[i]['added_date'];
+        }
+      }
+      //print("fetching trackssdfgasdgd " + maps[0]['oid'].toString());
+      //print("fetching trackssdfgasdgd " + tracks[0].oid.toString());
+
+      return tracks;
+    } catch (e) {
+      print(
+          "AppDatabase.fetchTracksPage:fetching tracks error " + e.toString());
+      return [];
+    }
+  }
+
+  static Future<List<Track>> fetchTracksPageSearch(
+      int _limit, int offset, SortOrder sortOrder, String search) async {
+    try {
+      print("AppDatabase.fetchTracksPage:");
+      // Get a reference to the database.
+      final Database db = await (database as Future<Database>);
+
+      var searchSplit = search.split(' ');
+      String s = "";
+
+      for (int i = 0; i < searchSplit.length; i++) {
+        searchSplit[i] = searchSplit[i].trim();
+      }
+      searchSplit.removeWhere((e) => e.length == 0);
+      searchSplit.forEach((element) =>
+          {s += 'search_keys LIKE "%' + element.toString() + '%" AND '});
+      if (s.isNotEmpty) {
+        s = s.substring(0, s.length - 1 - 3);
+      }
+
+      var q =
+          'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
+              offset.toString() +
+              (searchSplit.length > 0 ? (' ) AND (' + s + ')') : (' )')) +
+              ' ORDER BY oid ASC LIMIT ' +
+              _limit.toString();
+
+      print(q);
+
+      return [];
+
+      // Query the table
+      //final List<Map<String, dynamic>> maps = await db.query('track', where: 'rowid > ?', whereArgs: [id],
+      //orderBy: 'rowid', limit: _limit);
+      //final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT * FROM track WHERE rowid NOT IN ( SELECT rowid FROM track ORDER BY rowid ASC LIMIT 50 ) ORDER BY rowid ASC LIMIT 10');
+      final List<Map<String, dynamic>> maps;
+
+      ///*
+      // https://gist.github.com/ssokolow/262503\
+      if (sortOrder == SortOrder.playlist) {
+        maps = await db.rawQuery('');
       } else if (sortOrder == SortOrder.playlist_desc) {
         maps = await db.rawQuery(
             'SELECT rowid as oid, * FROM track WHERE oid NOT IN ( SELECT oid FROM track ORDER BY oid ASC LIMIT ' +
@@ -982,5 +1092,4 @@ class AppDatabase {
     );
   }
   */
-
 }

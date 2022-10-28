@@ -14,6 +14,7 @@ class Track {
   Track(String this.name, String this.id, String this.file_path,
       {String this.artist = "",
       String this.artists = "",
+      String this.search_keys = "",
       int this.is_active = 1,
       int this.is_missing = 0,
       int this.is_downloaded = 0,
@@ -57,6 +58,7 @@ class Track {
   int? size;
   String artist;
   String? artists;
+  String? search_keys;
 
   Map<String, dynamic> toMap() {
     return {
@@ -82,6 +84,7 @@ class Track {
       'duration': duration,
       'size': size,
       'format': format,
+      'search_keys': search_keys,
     };
   }
 

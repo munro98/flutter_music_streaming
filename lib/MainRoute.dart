@@ -32,7 +32,8 @@ import 'widgets/TextFieldInput.dart';
 todo
 
 search filter
-add to queue queing system
+playlist management
+track queue system
 
 fix added_date sort order
 
@@ -81,7 +82,7 @@ const List<Choice> choices = const <Choice>[
 const List<Color> loopModeColors = const <Color>[
   Colors.black,
   Colors.blue,
-  Colors.yellow
+  Colors.lightGreen
 ];
 
 class MainRoute extends StatefulWidget {
@@ -176,6 +177,19 @@ class MainRouteState extends State<MainRoute> {
 
     _player.vlcPlayer?.playbackStream.listen((playback) {
       //this.setState(() => this.playback = playback);
+    });
+
+    _searchController.addListener(() {
+      final String text = _searchController.text.toLowerCase();
+      AppDatabase.fetchTracksPageSearch(_pageSize, 0, _sortOrder, text);
+
+      /*_searchController.value = _searchController.value.copyWith(
+        text: text,
+        selection:
+            TextSelection(baseOffset: text.length, extentOffset: text.length),
+        composing: TextRange.empty,
+      );
+      */
     });
 
     print(" initState" + _tracks.length.toString());
@@ -481,12 +495,8 @@ class MainRouteState extends State<MainRoute> {
         child: new Scaffold(
             key: scaffKey,
             drawer: new Drawer(
-
-                //child: new Padding(
-                //    padding: new EdgeInsets.only(top: MediaQuery.of(context).padding.top),
                 child: Container(
                     child: new ListView.builder(
-              //padding: new EdgeInsets.all(8.0),
               itemExtent: 40.0,
               itemCount: _playlists.length,
               itemBuilder: (BuildContext context, int index) {
@@ -702,9 +712,32 @@ class MainRouteState extends State<MainRoute> {
                                     HapticFeedback.lightImpact();
                                   },
                                 ),
-                                new IconButton(
-                                  icon: new Icon(Icons.loop,
-                                      color: loopModeColors[_loopMode.index]),
+                                new TextButton(
+                                  child: _loopMode == LoopMode.none
+                                      ? new Icon(Icons.loop,
+                                          color: loopModeColors[0])
+                                      : _loopMode == LoopMode.all
+                                          ? new Icon(Icons.loop,
+                                              color: loopModeColors[1])
+                                          : Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                  Align(
+                                                      alignment:
+                                                          Alignment.center,
+                                                      child: new Icon(
+                                                          Icons.loop,
+                                                          color: loopModeColors[
+                                                              1])),
+                                                  Align(
+                                                      alignment:
+                                                          Alignment.topCenter,
+                                                      child: Text("1",
+                                                          selectionColor:
+                                                              loopModeColors[
+                                                                  1]))
+                                                ]),
                                   onPressed: () {
                                     this.setState(() {
                                       _loopMode = LoopMode
@@ -719,8 +752,7 @@ class MainRouteState extends State<MainRoute> {
                     ]),
                 decoration: new BoxDecoration(
                   color: Colors.grey[400],
-                )) //Text("Player here", style: new TextStyle(fontSize: 16),)
-            ,
+                )),
             body: Column(children: <Widget>[
               _showSearchBar
                   ? TextFieldInput(

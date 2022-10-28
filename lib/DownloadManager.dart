@@ -1,28 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/services.dart';
-import 'package:http/http.dart';
-
-import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path/path.dart' as path_lib;
 
 import 'dart:isolate';
 import 'dart:ui';
 
+import 'FileUtil.dart';
+import 'Settings.dart';
 import 'Track.dart';
-import 'AppDatabase.dart';
-import 'API.dart';
-import 'Playlist.dart';
-import 'Player.dart';
-import 'SeekBar.dart';
 
 ReceivePort _port = ReceivePort();
 
@@ -70,5 +57,31 @@ class DownloadManager {
     final SendPort send =
         IsolateNameServer.lookupPortByName('downloader_send_port')!;
     send.send([id, status, progress]);
+  }
+
+  static void downloadTrack(Track track) async {
+    var permissionReady = await FileUtil.preparePermissions();
+    if (permissionReady) {
+      var saveDir = await FileUtil.prepTrackDir(track);
+
+      var filePath = path_lib.join(saveDir, path_lib.basename(track.file_path));
+      print("downloading to: " + filePath);
+
+      var checkDuplicate = File(filePath);
+
+      if (checkDuplicate.existsSync()) {
+        //do nothing
+      } else {
+        //download
+        var url = Settings.urlHTTP + "/api/track/" + track.id;
+        var id = await FlutterDownloader.enqueue(
+          url: url,
+          savedDir: saveDir,
+          fileName: path_lib.basename(track.file_path),
+          //showNotification: true,
+          //openFileFromNotification: true,
+        );
+      }
+    }
   }
 }

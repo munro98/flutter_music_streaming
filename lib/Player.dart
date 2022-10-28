@@ -19,6 +19,7 @@ import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+import 'DownloadManager.dart';
 import 'Settings.dart';
 import 'Track.dart';
 import 'AppDatabase.dart';
@@ -59,32 +60,23 @@ class Player {
   PlayContext _playContext = PlayContext.all;
   SortOrder _sortOrder = SortOrder.playlist;
 
-  Track? current;
-  int currentIndex = 0;
-  Duration currentDuration = new Duration();
-
-  List<Track> _tracks = [];
+  List<Track> _tracks = []; // Playlists are stored here
   List<Track> _shuffleTracks = [];
-
   Queue<String> _shufflePlayed = new Queue();
-  int _trackCount = 0;
 
   ReceivePort _port = ReceivePort();
-  late String _localPath;
+
+  Track? current;
+  Duration currentDuration = new Duration();
+  int currentIndex = 0;
+  int _trackCount = 0;
 
   LoopMode loopMode = LoopMode.none;
   bool isShuffle = false;
-
   late bool _permissionReady;
-  late bool _isLoading;
-
   bool ignoreStop = false;
 
   void init(Playlist playlist) {
-    if (Platform.isLinux || Platform.isWindows) {
-      vlcPlayer = VLC.Player(id: 69420, commandlineArguments: ['--no-video']);
-    }
-
     currentPlaylist = playlist;
 
     if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
@@ -124,6 +116,7 @@ class Player {
       });
     } else if (Platform.isWindows || Platform.isLinux) {
       // VLC initialization
+      vlcPlayer = VLC.Player(id: 69420, commandlineArguments: ['--no-video']);
 
       vlcPlayer?.playbackStream.listen((VLC.PlaybackState state) {
         //state.isPlaying;
@@ -135,9 +128,10 @@ class Player {
             skipNext(false);
           }
         } else if (state.isPlaying) {
-          print("VLCPlayer: music playing");
+          print("VLCPlayer: state.isPlaying");
           crt.playerPlayCallback();
-        } else {
+        } else if (!state.isPlaying) {
+          print("VLCPlayer: !state.isPlaying");
           crt.playerPausedCallback();
         }
       });
@@ -159,8 +153,8 @@ class Player {
       });
     }
 
-    _permissionReady = false;
-    _isLoading = true;
+    //_permissionReady = false;
+    //_isLoading = true;
 
     FileUtil.preparePermissions();
   }
@@ -314,46 +308,6 @@ class Player {
     }
   }
 
-  Future<String> prepTrackDir(Track track) async {
-    String trackLibDir = (await FileUtil.getAppMusicDir(""))!;
-
-    final dirname = path_lib.dirname(track.file_path);
-    final trackDir = path_lib.join(trackLibDir, dirname);
-    final savedDir = Directory(trackDir);
-    bool hasExisted = await savedDir.exists();
-
-    if (!hasExisted) {
-      savedDir.create();
-    }
-    return trackDir;
-  }
-
-  void downloadTrack(Track track) async {
-    _permissionReady = await FileUtil.preparePermissions();
-    if (_permissionReady) {
-      var saveDir = await prepTrackDir(track);
-
-      var filePath = path_lib.join(saveDir, path_lib.basename(track.file_path));
-      print("downloading to: " + filePath);
-
-      var checkDuplicate = File(filePath);
-
-      if (checkDuplicate.existsSync()) {
-        //do nothing
-      } else {
-        //download
-        var url = Settings.urlHTTP + "/api/track/" + track.id;
-        var id = await FlutterDownloader.enqueue(
-          url: url,
-          savedDir: saveDir,
-          fileName: path_lib.basename(track.file_path),
-          //showNotification: true,
-          //openFileFromNotification: true,
-        );
-      }
-    }
-  }
-
   void play(Track t, Playlist? p, int index, List<Track> track, int trackCount,
       SortOrder sortOrder) async {
     if (p!.id != currentPlaylist?.id) {
@@ -389,7 +343,7 @@ class Player {
           );
         } else {
           playStream(t);
-          downloadTrack(t); // queue for download
+          DownloadManager.downloadTrack(t); // queue for download
         }
       }
     } else if (Platform.isIOS) {

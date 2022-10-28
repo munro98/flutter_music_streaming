@@ -79,10 +79,8 @@ class Api {
 
     if (httpRequest.statusCode != HttpStatus.ok) {
       throw Exception("Error http " + httpRequest.statusCode.toString());
-      return tracks;
     }
 
-    //final responseBody = await httpResponse.transform(utf8.decoder).join();
     final jsonResponse = json.decode(httpRequest.body); //responseBody
 
     for (var d in jsonResponse['data']) {
@@ -97,8 +95,10 @@ class Api {
       var da = DateTime.parse(d['release_date']);
       print(da.toString());
 
-      Track track =
-          new Track(d['name'], d['_id'], d['file_path'], artist: d['artist']);
+      String keys = d['name'] + " " + d['artist'];
+
+      Track track = new Track(d['name'], d['_id'], d['file_path'],
+          artist: d['artist'], search_keys: keys);
 
       tracks.add(track);
     }
