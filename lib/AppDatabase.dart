@@ -945,7 +945,7 @@ class AppDatabase {
   //TODO: Test this
   static Future<Track> fetchNextTrackShuffle(
       String id, Queue<String> lastPlayed) async {
-    print("fetching track " + id);
+    print("fetching track shuffle " + id);
     // Get a reference to the database.
     final Database db = await (database as Future<Database>);
 

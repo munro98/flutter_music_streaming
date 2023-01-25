@@ -15,12 +15,12 @@ import 'dart:ui';
 import 'widgets/TextFieldInput.dart';
 
 class Settings {
-  static String url = "192.168.1.3:3000";
+  static String url = "192.168.50.21:3000";
   static String user = "";
   static String password = "";
 
   // must be set when changing the url
-  static String urlHTTP = "http://192.168.1.3:3000";
+  static String urlHTTP = "http://192.168.50.21:3000/";
 }
 
 class SettingsRoute extends StatefulWidget {

@@ -92,8 +92,11 @@ class Api {
         //track.artists = artists;
       }
 
-      var da = DateTime.parse(d['release_date']);
-      print(da.toString());
+      var release_date = d['release_date'];
+      if (release_date != null) {
+        var dt = DateTime.parse(release_date);
+        print(dt.toString());
+      }
 
       String keys = d['name'] + " " + d['artist'];
 

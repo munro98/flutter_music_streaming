@@ -441,11 +441,13 @@ class Player {
   }
 
   void seek(double value) {
+
     if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-      Duration? d = assetsAudioPlayer.current.value?.audio.duration;
-      Duration newD = d! * value;
-      assetsAudioPlayer.seek(newD);
-      //print(d);
+      if (assetsAudioPlayer.current.hasValue) {
+        Duration? d = assetsAudioPlayer.current.value?.audio.duration;
+        Duration newD = d! * value;
+        assetsAudioPlayer.seek(newD);
+      }
     } else if (Platform.isLinux || Platform.isWindows) {
       Duration? d = vlcPlayer?.position.duration;
       Duration newD = d! * value;

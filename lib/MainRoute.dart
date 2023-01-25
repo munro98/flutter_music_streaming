@@ -179,6 +179,8 @@ class MainRouteState extends State<MainRoute> {
       //this.setState(() => this.playback = playback);
     });
 
+    //itemScrollController.jumpTo(index: current.)
+
     _searchController.addListener(() {
       final String text = _searchController.text.toLowerCase();
       AppDatabase.fetchTracksPageSearch(_pageSize, 0, _sortOrder, text);
@@ -376,7 +378,10 @@ class MainRouteState extends State<MainRoute> {
     if (playlist.id == "#ALL#") {
       int trackCount = await AppDatabase.fetchTracksCount();
       print("main.loadPlaylist: " + trackCount.toString());
+      //_pageMap = ;
       _fetchPage(0, playlist.id, sortOrder);
+
+      _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
 
       setState(() {
         _sortOrder = sortOrder;
@@ -384,8 +389,6 @@ class MainRouteState extends State<MainRoute> {
         _trackCount = trackCount;
         _vs = PlayContext.all;
       });
-
-      _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
     } else if (playlist.id == "#FAV#") {
       int trackCount = await AppDatabase.fetchTracksCountFav();
       print("main.loadPlaylist: " + trackCount.toString());

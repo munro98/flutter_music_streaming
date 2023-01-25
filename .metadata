@@ -4,8 +4,8 @@
 # This file should be version controlled.
 
 version:
-  revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
-  channel: master
+  revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
+  channel: stable
 
 project_type: app
 
@@ -13,17 +13,17 @@ project_type: app
 migration:
   platforms:
     - platform: root
-      create_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
-      base_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
+      create_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
+      base_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
     - platform: linux
-      create_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
-      base_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
+      create_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
+      base_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
     - platform: macos
-      create_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
-      base_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
+      create_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
+      base_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
     - platform: windows
-      create_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
-      base_revision: d37b6fe9fe6760da805dfcbfcb036953715d3434
+      create_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
+      base_revision: 52b3dc25f6471c27b2144594abb11c741cb88f57
 
   # User provided section
 
