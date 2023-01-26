@@ -25,6 +25,7 @@ import 'AppDatabase.dart';
 import 'API.dart';
 import 'Playlist.dart';
 import 'SeekBar.dart';
+import 'VolumeBar.dart';
 import 'Settings.dart';
 import 'widgets/TextFieldInput.dart';
 
@@ -37,7 +38,6 @@ track queue system
 
 fix added_date sort order
 
-sqflite_common_ffi for database
 windows downloading
 macos downloading
 
@@ -93,8 +93,6 @@ class MainRoute extends StatefulWidget {
 }
 
 class MainRouteState extends State<MainRoute> {
-  //String? localFilePath;
-
   final Playlist allPlayList = new Playlist("All Music", "#ALL#");
   final Playlist favouritePlayList = new Playlist("Favourites", "#FAV#");
 
@@ -113,11 +111,6 @@ class MainRouteState extends State<MainRoute> {
   final int _pageSize = 128;
   final int _maxPagesSize = 16;
 
-  Map<int, bool> _pageMapIsFetching = Map<int, bool>();
-  Map<int, List<Track>> _pageMap = Map<int, List<Track>>();
-  int _pageMapCount = 0;
-  int _trackCount = 0;
-
   String _currentTrack = "";
   bool _showSearchBar = false;
   bool _shuffleMode = false;
@@ -128,6 +121,8 @@ class MainRouteState extends State<MainRoute> {
   GlobalKey<SeekBarState> _seekKey = GlobalKey();
   GlobalKey<ScaffoldState> scaffKey = new GlobalKey<ScaffoldState>();
   TextEditingController _searchController = TextEditingController();
+
+  GlobalKey<SeekBarState> _volKey = GlobalKey();
 
   final ItemScrollController itemScrollController = ItemScrollController();
   final ItemPositionsListener itemPositionsListener =
@@ -179,8 +174,6 @@ class MainRouteState extends State<MainRoute> {
       //this.setState(() => this.playback = playback);
     });
 
-    //itemScrollController.jumpTo(index: current.)
-
     _searchController.addListener(() {
       final String text = _searchController.text.toLowerCase();
       AppDatabase.fetchTracksPageSearch(_pageSize, 0, _sortOrder, text);
@@ -223,6 +216,14 @@ class MainRouteState extends State<MainRoute> {
     send.send([id, status, progress]);
   }
 
+  void jumpTo(int? i) {
+    //if (_currentPlayList == _player.currentPlaylist) {
+    print('MainRoute:jumpTo ' + i.toString());
+    // TODO map to list location
+    itemScrollController.jumpTo(index: i!);
+    //}
+  }
+
   fetchPlaylists() async {
     //print(" fetchPlaylists" + _playlists.length.toString());
     try {
@@ -245,73 +246,20 @@ class MainRouteState extends State<MainRoute> {
     }
   }
 
-  // TODO: figure when to remove data
-  Future<void> _fetchPage(int pageKey, String id, SortOrder sortOrder) async {
-    try {
-      if (_pageMapIsFetching.containsKey(pageKey)) return;
-
-      _pageMapIsFetching[pageKey] = true;
-
-      // Remove old pages outside of the scroll viewable area
-      /*
-      // TODO: figure out a better way to do this
-      if (_pageMap.length > _maxPagesSize) {
-        for (int i = 0; i < pageKey - 10; i++) {
-          if (_pageMap.containsKey(i)) {
-            _pageMap.remove(i);
-          }
-        }
-        for (int i = pageKey+10; i > pageKey; i--) {
-          if (_pageMap.containsKey(i)) {
-            _pageMap.remove(i);
-          }
-        }
-        
-      }
-      */
-
-      // fill new pages
-      List<Track> data;
-
-      if (_currentPlayList.id == "#FAV#") {
-        data =
-            await AppDatabase.fetchTracksPageFav(_pageSize, pageKey, sortOrder);
-      } else {
-        data = await AppDatabase.fetchTracksPage(_pageSize, pageKey, sortOrder);
-      }
-
-      print("main._fetchPage: GOT PAGE DATA: " + pageKey.toString());
-
-      int count = 0;
-      _pageMap.forEach((k, v) => {count += v.length});
-      count += data.length;
-
-      _pageMapIsFetching.remove(pageKey);
-
-      this.setState(() {
-        _pageMap[pageKey] = data;
-        _pageMapCount = count;
-      });
-    } catch (e) {
-      _pageMapIsFetching.remove(pageKey);
+  Future<void> _fetchTracks() async {
+    try {} catch (e) {
+      print("MainRoute:_fetchTracks: Error: " + e.toString());
     }
   }
 
   bool _hasTrack(int index) {
-    int page = (index ~/ _pageSize).toInt();
-    int pIndex = index % _pageSize;
-
-    if (!_pageMap.containsKey(page)) return false;
-    if (pIndex >= _pageMap[page]!.length) return false;
-
+    // TODO remove
     return true;
   }
 
   Track _fetchTrack(int index) {
-    int page = (index ~/ _pageSize).toInt();
-    int pIndex = index % _pageSize;
-    //print("main._fetchTrack: " + page.toString() + " " + _pageMap.length.toString());
-    return _pageMap[page]![pIndex];
+    // TODO remove
+    return _tracks[index]!;
   }
 
   void _select(Choice choice) {
@@ -374,33 +322,114 @@ class MainRouteState extends State<MainRoute> {
         playlist.id == _player.currentPlaylist?.id) {
       sortOrder = _player.getCurrentSortOrder();
     }
-
     if (playlist.id == "#ALL#") {
-      int trackCount = await AppDatabase.fetchTracksCount();
-      print("main.loadPlaylist: " + trackCount.toString());
-      //_pageMap = ;
-      _fetchPage(0, playlist.id, sortOrder);
+      //
 
-      _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
+      if (playlist.id == _currentPlayList.id &&
+          playlist.id == _player.currentPlaylist!.id) {
+        List<Track> data = _player.getTracks();
+        print(
+            "MainRoute:_fetchTracks: GOT PAGE DATA: " + data.length.toString());
 
-      setState(() {
-        _sortOrder = sortOrder;
-        _currentPlayList = playlist;
-        _trackCount = trackCount;
-        _vs = PlayContext.all;
-      });
+        List<TrackPair> trackP = [];
+
+        for (int i = 0; i < data.length; i++) {
+          data[i].playlist_index = i;
+          trackP.add(new TrackPair(i, data[i]));
+        }
+
+        if (_sortOrder == SortOrder.name) {
+          trackP.sort(((l, r) => Track.nameCompare(l.track, r.track)));
+        } else if (_sortOrder == SortOrder.name_desc) {
+          trackP.sort(((l, r) => Track.nameCompareReverse(l.track, r.track)));
+        } else if (_sortOrder == SortOrder.artist) {
+          trackP.sort(((l, r) => Track.artistCompare(l.track, r.track)));
+        } else if (_sortOrder == SortOrder.artist_desc) {
+          trackP.sort(((l, r) => Track.artistCompareReverse(l.track, r.track)));
+        } else if (_sortOrder == SortOrder.added) {
+          trackP.sort(((l, r) => Track.addedCompare(l.track, r.track)));
+        } else if (_sortOrder == SortOrder.added_desc) {
+          trackP.sort(((l, r) => Track.addedCompareReverse(l.track, r.track)));
+        } else if (_sortOrder == SortOrder.playlist) {
+          trackP.sort(((l, r) => Track.playlistCompare(l.track, r.track)));
+        } else if (_sortOrder == SortOrder.playlist_desc) {
+          trackP
+              .sort(((l, r) => Track.playlistCompareReverse(l.track, r.track)));
+        }
+        /* move the player index after reordering the playlist
+        a 0 <- index
+        b 1
+        c 2
+        -> after sorting
+        c 2
+        b 1
+        a 0 <- index
+        */
+        List<Track> sortedTracks = [];
+        int pIndex = _player.currentIndex;
+        int newPIndex = -1;
+        for (int i = 0; i < trackP.length; i++) {
+          sortedTracks.add(trackP[i].track);
+          if (trackP[i].index == pIndex) {
+            newPIndex = i;
+          }
+        }
+
+        _player.currentIndex = newPIndex;
+        _player.setTracks(sortedTracks);
+
+        print("MainRoute:_fetchTracks: sortedTracks: " +
+            sortedTracks.length.toString());
+
+        this.setState(() {
+          _tracks = sortedTracks;
+        });
+
+        setState(() {
+          _sortOrder = sortOrder;
+          _currentPlayList = playlist;
+          _vs = PlayContext.all;
+        });
+      } else {
+        List<Track> trackP = await await AppDatabase.fetchTracks();
+        for (int i = 0; i < trackP.length; i++) {
+          trackP[i].playlist_index = i;
+        }
+
+        if (sortOrder == SortOrder.name) {
+          trackP.sort(((l, r) => Track.nameCompare(l, r)));
+        } else if (sortOrder == SortOrder.name_desc) {
+          trackP.sort(((l, r) => Track.nameCompareReverse(l, r)));
+        } else if (sortOrder == SortOrder.artist) {
+          trackP.sort(((l, r) => Track.artistCompare(l, r)));
+        } else if (sortOrder == SortOrder.artist_desc) {
+          trackP.sort(((l, r) => Track.artistCompareReverse(l, r)));
+        } else if (sortOrder == SortOrder.added) {
+          trackP.sort(((l, r) => Track.addedCompare(l, r)));
+        } else if (sortOrder == SortOrder.added_desc) {
+          trackP.sort(((l, r) => Track.addedCompareReverse(l, r)));
+        } else if (sortOrder == SortOrder.playlist) {
+          trackP.sort(((l, r) => Track.playlistCompare(l, r)));
+        } else if (sortOrder == SortOrder.playlist_desc) {
+          trackP.sort(((l, r) => Track.playlistCompareReverse(l, r)));
+        }
+
+        setState(() {
+          _tracks = trackP;
+          _sortOrder = sortOrder;
+          _currentPlayList = playlist;
+          _vs = PlayContext.all;
+        });
+      }
     } else if (playlist.id == "#FAV#") {
       int trackCount = await AppDatabase.fetchTracksCountFav();
       print("main.loadPlaylist: " + trackCount.toString());
-      _fetchPage(0, playlist.id, sortOrder);
 
       setState(() {
         _sortOrder = sortOrder;
         _currentPlayList = playlist;
-        _trackCount = trackCount;
         _vs = PlayContext.all;
       });
-      _pageMap.forEach((k, v) => {_fetchPage(k, playlist.id, sortOrder)});
     } else {
       // Switching to actively playing playlist
       if (playlist.id == _currentPlayList.id &&
@@ -449,7 +478,6 @@ class MainRouteState extends State<MainRoute> {
           }
         }
         _player.currentIndex = newPIndex;
-
         _player.setTracks(sortedTracks);
 
         setState(() {
@@ -696,8 +724,8 @@ class MainRouteState extends State<MainRoute> {
                                 new IconButton(
                                   iconSize: 60,
                                   icon: _isPlaying
-                                      ? new Icon(Icons.play_arrow)
-                                      : new Icon(Icons.pause_sharp),
+                                      ? new Icon(Icons.pause_sharp)
+                                      : new Icon(Icons.play_arrow),
                                   onPressed: () {
                                     _player.playOrPause();
                                     /* ScaffoldMessenger.of(context)
@@ -751,6 +779,7 @@ class MainRouteState extends State<MainRoute> {
                                     print("loopmode: " + _loopMode.toString());
                                   },
                                 ),
+                                VolumeBar(this, key: _volKey)
                               ]))
                     ]),
                 decoration: new BoxDecoration(
@@ -784,14 +813,13 @@ class MainRouteState extends State<MainRoute> {
                           child: ScrollablePositionedList.builder(
                               itemScrollController: itemScrollController,
                               itemPositionsListener: itemPositionsListener,
-                              itemCount: _trackCount,
+                              itemCount: _tracks.length,
                               itemBuilder: (context, index) {
                                 if (_hasTrack(index)) {
                                   return new TrackItem(
                                       _fetchTrack(index), index, this);
                                 } else {
-                                  _fetchPage((index ~/ _pageSize).toInt(),
-                                      _currentPlayList.id, _sortOrder);
+                                  _fetchTracks();
                                   return Center(
                                       child: CircularProgressIndicator());
                                 }
@@ -801,7 +829,8 @@ class MainRouteState extends State<MainRoute> {
   }
 
   void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
-    _player.play(l, currentPlayList, index, _tracks, _trackCount, _sortOrder);
+    _player.play(
+        l, currentPlayList, index, _tracks, _tracks.length, _sortOrder);
 
     //_seekKey.currentState?.reset();
     Duration d = _player.assetsAudioPlayer.currentPosition.value;
@@ -832,6 +861,14 @@ class MainRouteState extends State<MainRoute> {
 
   void updateSeekBar(double fraction) {
     _seekKey.currentState?.setValue(fraction);
+  }
+
+  void vol(double value) {
+    _player.vol(value);
+  }
+
+  void updateVolBar(double fraction) {
+    _volKey.currentState?.setValue(fraction);
   }
 
   void setLoopModeCallback(LoopMode loopMode) {
@@ -894,7 +931,10 @@ class TrackItem extends StatelessWidget {
                       child: new Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            l.artist + " - " + l.name //+
+                            l.artist +
+                                " - " +
+                                l.name +
+                                l.playlist_index.toString() //+
                             //l.added_date.toString() //+
                             //l.file_path +
                             //"(" +

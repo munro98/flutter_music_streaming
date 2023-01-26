@@ -58,7 +58,7 @@ class VolumeBarState extends State<VolumeBar> with TickerProviderStateMixin {
                 //divisions: 5,
                 //label: progressValue.round().toString(),
                 onChanged: (double value) {
-                  //crt.seek(value);
+                  crt.vol(value);
                   setState(() {
                     progressValue = value;
                   });
@@ -88,7 +88,7 @@ class CustomTrackShape extends RoundedRectSliderTrackShape {
     final double? trackHeight = sliderTheme.trackHeight;
     final double trackLeft = offset.dx;
     final double trackTop =
-        offset.dy + (parentBox.size.height - trackHeight!) / 1;
+        offset.dy + (parentBox.size.height - trackHeight!) / 2;
     final double trackWidth = parentBox.size.width;
     return Rect.fromLTWH(trackLeft, trackTop, trackWidth, trackHeight);
   }
