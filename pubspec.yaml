@@ -47,6 +47,7 @@ dependencies:
   shared_preferences: ^2.0.15
   sqflite_common_ffi: ^2.1.1+1
   sqlite3_flutter_libs: ^0.5.7
+  mutex: ^3.0.1
 
 dev_dependencies:
   flutter_test:

@@ -32,6 +32,9 @@ import 'widgets/TextFieldInput.dart';
 /*
 todo
 
+
+fix track info not syncing betwee devices
+
 search filter
 playlist management
 track queue system
@@ -97,6 +100,10 @@ class MainRouteState extends State<MainRoute> {
   final Playlist favouritePlayList = new Playlist("Favourites", "#FAV#");
 
   List<Track> _tracks = <Track>[];
+  //Map<int, int> _tracksIndexToRowid = {};
+  Map<String, Track> _tracksRowidToIndex = {};
+
+  List<Track> _searchTracks = <Track>[];
   late Playlist _currentPlayList = allPlayList;
   late Playlist _playingPlayList = allPlayList;
   Choice _selectedChoice = choices[0];
@@ -132,6 +139,8 @@ class MainRouteState extends State<MainRoute> {
   void initState() {
     super.initState();
 
+    Settings.loadFromPrefs();
+
     IsolateNameServer.registerPortWithName(
         _port.sendPort, 'downloader_send_port');
     _port.listen((dynamic data) {
@@ -166,7 +175,6 @@ class MainRouteState extends State<MainRoute> {
         ((duration) => {_seekKey.currentState?.setProgressDuration(duration)}));
 
     _player.vlcPlayer?.positionStream.listen((position) {
-      //this.setState(() => this.position = position);
       _seekKey.currentState?.setProgressDuration(position.duration!);
     });
 
@@ -174,9 +182,17 @@ class MainRouteState extends State<MainRoute> {
       //this.setState(() => this.playback = playback);
     });
 
-    _searchController.addListener(() {
+    _searchController.addListener(() async {
       final String text = _searchController.text.toLowerCase();
-      AppDatabase.fetchTracksPageSearch(_pageSize, 0, _sortOrder, text);
+
+      if (text.length == 0) return;
+
+      List<Track> tracks =
+          await AppDatabase.fetchTracksSearch(_sortOrder, false, text);
+
+      setState(() {
+        _searchTracks = tracks;
+      });
 
       /*_searchController.value = _searchController.value.copyWith(
         text: text,
@@ -193,6 +209,8 @@ class MainRouteState extends State<MainRoute> {
   @override
   void dispose() {
     IsolateNameServer.removePortNameMapping('downloader_send_port');
+
+    _player.unInit();
 
     super.dispose();
   }
@@ -219,8 +237,20 @@ class MainRouteState extends State<MainRoute> {
   void jumpTo(int? i) {
     //if (_currentPlayList == _player.currentPlaylist) {
     print('MainRoute:jumpTo ' + i.toString());
+    //print('MainRoute:jumpTo ' + (itemScrollController == null).toString());
     // TODO map to list location
-    itemScrollController.jumpTo(index: i!);
+    //Track? t = _tracksRowidToIndex[i.toString()];
+    /* if (t?.playlist_index != null) {
+      itemScrollController.jumpTo(index: t?.playlist_index as int);
+    } */
+
+    try {
+      itemScrollController.scrollTo(
+          index: 100, duration: new Duration(seconds: 1));
+      //itemScrollController.jumpTo(index: 0);
+    } catch (e) {
+      print('MainRoute:jumpTo ' + e.toString());
+    }
     //}
   }
 
@@ -246,20 +276,9 @@ class MainRouteState extends State<MainRoute> {
     }
   }
 
-  Future<void> _fetchTracks() async {
-    try {} catch (e) {
-      print("MainRoute:_fetchTracks: Error: " + e.toString());
-    }
-  }
-
   bool _hasTrack(int index) {
     // TODO remove
     return true;
-  }
-
-  Track _fetchTrack(int index) {
-    // TODO remove
-    return _tracks[index]!;
   }
 
   void _select(Choice choice) {
@@ -273,9 +292,10 @@ class MainRouteState extends State<MainRoute> {
     // TODO: pagingate server API requests
     final tracks = await Api.fetchTracks("track", "");
 
-    for (int i = 0; i < tracks.length; i++) {
+    AppDatabase.insertTrackList(tracks);
+    /* for (int i = 0; i < tracks.length; i++) {
       AppDatabase.insertTrack(tracks[i]);
-    }
+    } */
   }
 
   void refreshPlaylists() async {
@@ -317,46 +337,39 @@ class MainRouteState extends State<MainRoute> {
   }
 
   void loadPlaylist(Playlist playlist, SortOrder sortOrder) async {
-    // coming from another playlist to one currently playing
     if (playlist.id != _currentPlayList.id &&
         playlist.id == _player.currentPlaylist?.id) {
       sortOrder = _player.getCurrentSortOrder();
     }
-    if (playlist.id == "#ALL#") {
-      //
 
-      if (playlist.id == _currentPlayList.id &&
-          playlist.id == _player.currentPlaylist!.id) {
-        List<Track> data = _player.getTracks();
-        print(
-            "MainRoute:_fetchTracks: GOT PAGE DATA: " + data.length.toString());
+    if (playlist.id == _currentPlayList.id &&
+        playlist.id == _player.currentPlaylist!.id) {
+      List<Track> data = _player.getTracks();
+      List<TrackPair> trackP = [];
 
-        List<TrackPair> trackP = [];
+      for (int i = 0; i < data.length; i++) {
+        data[i].playlist_index = i;
+        trackP.add(new TrackPair(i, data[i]));
+      }
 
-        for (int i = 0; i < data.length; i++) {
-          data[i].playlist_index = i;
-          trackP.add(new TrackPair(i, data[i]));
-        }
-
-        if (_sortOrder == SortOrder.name) {
-          trackP.sort(((l, r) => Track.nameCompare(l.track, r.track)));
-        } else if (_sortOrder == SortOrder.name_desc) {
-          trackP.sort(((l, r) => Track.nameCompareReverse(l.track, r.track)));
-        } else if (_sortOrder == SortOrder.artist) {
-          trackP.sort(((l, r) => Track.artistCompare(l.track, r.track)));
-        } else if (_sortOrder == SortOrder.artist_desc) {
-          trackP.sort(((l, r) => Track.artistCompareReverse(l.track, r.track)));
-        } else if (_sortOrder == SortOrder.added) {
-          trackP.sort(((l, r) => Track.addedCompare(l.track, r.track)));
-        } else if (_sortOrder == SortOrder.added_desc) {
-          trackP.sort(((l, r) => Track.addedCompareReverse(l.track, r.track)));
-        } else if (_sortOrder == SortOrder.playlist) {
-          trackP.sort(((l, r) => Track.playlistCompare(l.track, r.track)));
-        } else if (_sortOrder == SortOrder.playlist_desc) {
-          trackP
-              .sort(((l, r) => Track.playlistCompareReverse(l.track, r.track)));
-        }
-        /* move the player index after reordering the playlist
+      if (_sortOrder == SortOrder.name) {
+        trackP.sort(((l, r) => Track.nameCompare(l.track, r.track)));
+      } else if (_sortOrder == SortOrder.name_desc) {
+        trackP.sort(((l, r) => Track.nameCompareReverse(l.track, r.track)));
+      } else if (_sortOrder == SortOrder.artist) {
+        trackP.sort(((l, r) => Track.artistCompare(l.track, r.track)));
+      } else if (_sortOrder == SortOrder.artist_desc) {
+        trackP.sort(((l, r) => Track.artistCompareReverse(l.track, r.track)));
+      } else if (_sortOrder == SortOrder.added) {
+        trackP.sort(((l, r) => Track.addedCompare(l.track, r.track)));
+      } else if (_sortOrder == SortOrder.added_desc) {
+        trackP.sort(((l, r) => Track.addedCompareReverse(l.track, r.track)));
+      } else if (_sortOrder == SortOrder.playlist) {
+        trackP.sort(((l, r) => Track.playlistCompare(l.track, r.track)));
+      } else if (_sortOrder == SortOrder.playlist_desc) {
+        trackP.sort(((l, r) => Track.playlistCompareReverse(l.track, r.track)));
+      }
+      /* move the player index after reordering the playlist
         a 0 <- index
         b 1
         c 2
@@ -365,157 +378,86 @@ class MainRouteState extends State<MainRoute> {
         b 1
         a 0 <- index
         */
-        List<Track> sortedTracks = [];
-        int pIndex = _player.currentIndex;
-        int newPIndex = -1;
-        for (int i = 0; i < trackP.length; i++) {
-          sortedTracks.add(trackP[i].track);
-          if (trackP[i].index == pIndex) {
-            newPIndex = i;
-          }
+      List<Track> sortedTracks = [];
+      int pIndex = _player.currentIndex;
+      int newPIndex = -1;
+      for (int i = 0; i < trackP.length; i++) {
+        sortedTracks.add(trackP[i].track);
+        if (trackP[i].index == pIndex) {
+          newPIndex = i;
         }
-
-        _player.currentIndex = newPIndex;
-        _player.setTracks(sortedTracks);
-
-        print("MainRoute:_fetchTracks: sortedTracks: " +
-            sortedTracks.length.toString());
-
-        this.setState(() {
-          _tracks = sortedTracks;
-        });
-
-        setState(() {
-          _sortOrder = sortOrder;
-          _currentPlayList = playlist;
-          _vs = PlayContext.all;
-        });
-      } else {
-        List<Track> trackP = await await AppDatabase.fetchTracks();
-        for (int i = 0; i < trackP.length; i++) {
-          trackP[i].playlist_index = i;
-        }
-
-        if (sortOrder == SortOrder.name) {
-          trackP.sort(((l, r) => Track.nameCompare(l, r)));
-        } else if (sortOrder == SortOrder.name_desc) {
-          trackP.sort(((l, r) => Track.nameCompareReverse(l, r)));
-        } else if (sortOrder == SortOrder.artist) {
-          trackP.sort(((l, r) => Track.artistCompare(l, r)));
-        } else if (sortOrder == SortOrder.artist_desc) {
-          trackP.sort(((l, r) => Track.artistCompareReverse(l, r)));
-        } else if (sortOrder == SortOrder.added) {
-          trackP.sort(((l, r) => Track.addedCompare(l, r)));
-        } else if (sortOrder == SortOrder.added_desc) {
-          trackP.sort(((l, r) => Track.addedCompareReverse(l, r)));
-        } else if (sortOrder == SortOrder.playlist) {
-          trackP.sort(((l, r) => Track.playlistCompare(l, r)));
-        } else if (sortOrder == SortOrder.playlist_desc) {
-          trackP.sort(((l, r) => Track.playlistCompareReverse(l, r)));
-        }
-
-        setState(() {
-          _tracks = trackP;
-          _sortOrder = sortOrder;
-          _currentPlayList = playlist;
-          _vs = PlayContext.all;
-        });
       }
-    } else if (playlist.id == "#FAV#") {
-      int trackCount = await AppDatabase.fetchTracksCountFav();
-      print("main.loadPlaylist: " + trackCount.toString());
+
+      _player.currentIndex = newPIndex;
+      _player.setTracks(sortedTracks);
+
+      print("MainRoute:_fetchTracks: sortedTracks: " +
+          sortedTracks.length.toString());
+
+      Map<String, Track> tracksRowidToIndex = {};
+
+      trackP.forEach((element) {
+        String soid = "";
+        soid = element.track.oid!;
+        tracksRowidToIndex[soid] = element.track;
+      });
 
       setState(() {
+        _tracks = sortedTracks;
+        _tracksRowidToIndex = tracksRowidToIndex;
         _sortOrder = sortOrder;
         _currentPlayList = playlist;
         _vs = PlayContext.all;
       });
     } else {
-      // Switching to actively playing playlist
-      if (playlist.id == _currentPlayList.id &&
-          playlist.id == _player.currentPlaylist!.id) {
-        List<TrackPair> trackP = [];
-        List<Track> playerTracks = _player.getTracks();
-
-        for (int i = 0; i < playerTracks.length; i++) {
-          trackP.add(new TrackPair(i, playerTracks[i]));
-        }
-
-        if (sortOrder == SortOrder.name) {
-          trackP.sort(((l, r) => Track.nameCompare(l.track, r.track)));
-        } else if (sortOrder == SortOrder.name_desc) {
-          trackP.sort(((l, r) => Track.nameCompareReverse(l.track, r.track)));
-        } else if (sortOrder == SortOrder.artist) {
-          trackP.sort(((l, r) => Track.artistCompare(l.track, r.track)));
-        } else if (sortOrder == SortOrder.artist_desc) {
-          trackP.sort(((l, r) => Track.artistCompareReverse(l.track, r.track)));
-        } else if (sortOrder == SortOrder.added) {
-          trackP.sort(((l, r) => Track.addedCompare(l.track, r.track)));
-        } else if (sortOrder == SortOrder.added_desc) {
-          trackP.sort(((l, r) => Track.addedCompareReverse(l.track, r.track)));
-        } else if (sortOrder == SortOrder.playlist) {
-          trackP.sort(((l, r) => Track.playlistCompare(l.track, r.track)));
-        } else if (sortOrder == SortOrder.playlist_desc) {
-          trackP
-              .sort(((l, r) => Track.playlistCompareReverse(l.track, r.track)));
-        }
-        /* move the player index after reordering the playlist
-        a 0 <- index
-        b 1
-        c 2
-        -> after sorting
-        c 2
-        b 1
-        a 0 <- index
-        */
-        List<Track> sortedTracks = [];
-        int pIndex = _player.currentIndex;
-        int newPIndex = -1;
-        for (int i = 0; i < trackP.length; i++) {
-          sortedTracks.add(trackP[i].track);
-          if (trackP[i].index == pIndex) {
-            newPIndex = i;
-          }
-        }
-        _player.currentIndex = newPIndex;
-        _player.setTracks(sortedTracks);
-
-        setState(() {
-          _sortOrder = sortOrder;
-          _currentPlayList = playlist;
-          _vs = PlayContext.playlist;
-          _tracks = sortedTracks;
-        });
+      List<Track> trackP;
+      if (playlist.id == "#ALL#") {
+        trackP = await AppDatabase.fetchTracks();
+      } else if (playlist.id == "#FAV#") {
+        trackP = await AppDatabase.fetchTracksFavourites();
       } else {
         final tracksids =
             await PlaylistManager.fetchPlaylistsTracks(playlist.id);
-        List<Track> trackP = await AppDatabase.fetchPlaylistTracks(tracksids);
-
-        if (sortOrder == SortOrder.name) {
-          trackP.sort(((l, r) => Track.nameCompare(l, r)));
-        } else if (sortOrder == SortOrder.name_desc) {
-          trackP.sort(((l, r) => Track.nameCompareReverse(l, r)));
-        } else if (sortOrder == SortOrder.artist) {
-          trackP.sort(((l, r) => Track.artistCompare(l, r)));
-        } else if (sortOrder == SortOrder.artist_desc) {
-          trackP.sort(((l, r) => Track.artistCompareReverse(l, r)));
-        } else if (sortOrder == SortOrder.added) {
-          trackP.sort(((l, r) => Track.addedCompare(l, r)));
-        } else if (sortOrder == SortOrder.added_desc) {
-          trackP.sort(((l, r) => Track.addedCompareReverse(l, r)));
-        } else if (sortOrder == SortOrder.playlist) {
-          trackP.sort(((l, r) => Track.playlistCompare(l, r)));
-        } else if (sortOrder == SortOrder.playlist_desc) {
-          trackP.sort(((l, r) => Track.playlistCompareReverse(l, r)));
-        }
-
-        setState(() {
-          _sortOrder = sortOrder;
-          _currentPlayList = playlist;
-          _vs = PlayContext.playlist;
-          _tracks = trackP;
-        });
+        trackP = await AppDatabase.fetchPlaylistTracks(tracksids);
       }
+
+      for (int i = 0; i < trackP.length; i++) {
+        trackP[i].playlist_index = i;
+      }
+
+      if (sortOrder == SortOrder.name) {
+        trackP.sort(((l, r) => Track.nameCompare(l, r)));
+      } else if (sortOrder == SortOrder.name_desc) {
+        trackP.sort(((l, r) => Track.nameCompareReverse(l, r)));
+      } else if (sortOrder == SortOrder.artist) {
+        trackP.sort(((l, r) => Track.artistCompare(l, r)));
+      } else if (sortOrder == SortOrder.artist_desc) {
+        trackP.sort(((l, r) => Track.artistCompareReverse(l, r)));
+      } else if (sortOrder == SortOrder.added) {
+        trackP.sort(((l, r) => Track.addedCompare(l, r)));
+      } else if (sortOrder == SortOrder.added_desc) {
+        trackP.sort(((l, r) => Track.addedCompareReverse(l, r)));
+      } else if (sortOrder == SortOrder.playlist) {
+        trackP.sort(((l, r) => Track.playlistCompare(l, r)));
+      } else if (sortOrder == SortOrder.playlist_desc) {
+        trackP.sort(((l, r) => Track.playlistCompareReverse(l, r)));
+      }
+
+      Map<String, Track> tracksRowidToIndex = {};
+
+      trackP.forEach((element) {
+        String soid = "";
+        soid = element.oid!;
+        tracksRowidToIndex[soid] = element;
+      });
+
+      setState(() {
+        _sortOrder = sortOrder;
+        _tracksRowidToIndex = tracksRowidToIndex;
+        _currentPlayList = playlist;
+        _vs = PlayContext.playlist;
+        _tracks = trackP;
+      });
     }
   }
 
@@ -793,44 +735,56 @@ class MainRouteState extends State<MainRoute> {
                       textInputType: TextInputType.name)
                   : Container(),
               Expanded(
-                  child: _vs == PlayContext.playlist
-                      ? ScrollablePositionedList.builder(
-                          itemCount: _tracks.length,
+                  child: _showSearchBar && _searchController.text.length > 0
+                      ?
+                      // Render Search list
+                      ScrollablePositionedList.builder(
+                          itemCount: _searchTracks.length,
                           itemBuilder: (BuildContext context, int index) {
-                            return new TrackItem(_tracks[index], index, this);
+                            return new TrackItem(
+                                _searchTracks[index], index, this);
                           },
                         )
-                      : NotificationListener<ScrollUpdateNotification>(
-                          onNotification: (notification) {
-                            //_onScroll(notification);
-                            //How many pixels scrolled from pervious frame
-                            //print(notification.scrollDelta);
-
-                            //List scroll position
-                            //print(notification.metrics.pixels);
-                            return true;
-                          },
-                          child: ScrollablePositionedList.builder(
-                              itemScrollController: itemScrollController,
-                              itemPositionsListener: itemPositionsListener,
+                      // Render Playlist
+                      : _vs == PlayContext.playlist
+                          ? ScrollablePositionedList.builder(
                               itemCount: _tracks.length,
-                              itemBuilder: (context, index) {
-                                if (_hasTrack(index)) {
-                                  return new TrackItem(
-                                      _fetchTrack(index), index, this);
-                                } else {
-                                  _fetchTracks();
-                                  return Center(
-                                      child: CircularProgressIndicator());
-                                }
-                              }),
-                        ))
+                              itemBuilder: (BuildContext context, int index) {
+                                return new TrackItem(
+                                    _tracks[index], index, this);
+                              },
+                            )
+                          // Render Library
+                          : NotificationListener<ScrollUpdateNotification>(
+                              onNotification: (notification) {
+                                //_onScroll(notification);
+                                //How many pixels scrolled from pervious frame
+                                //print(notification.scrollDelta);
+
+                                //List scroll position
+                                //print(notification.metrics.pixels);
+                                return true;
+                              },
+                              child: ScrollablePositionedList.builder(
+                                  itemScrollController: itemScrollController,
+                                  itemPositionsListener: itemPositionsListener,
+                                  itemCount: _tracks.length,
+                                  itemBuilder: (context, index) {
+                                    if (_hasTrack(index)) {
+                                      return new TrackItem(
+                                          _tracks[index], index, this);
+                                    } else {
+                                      //_fetchTracks();
+                                      return Center(
+                                          child: CircularProgressIndicator());
+                                    }
+                                  }),
+                            ))
             ])));
   }
 
   void play(Track l, Playlist currentPlayList, index, List<Track> tracks) {
-    _player.play(
-        l, currentPlayList, index, _tracks, _tracks.length, _sortOrder);
+    _player.play(l, currentPlayList, index, _tracks, _sortOrder);
 
     //_seekKey.currentState?.reset();
     Duration d = _player.assetsAudioPlayer.currentPosition.value;
@@ -876,6 +830,26 @@ class MainRouteState extends State<MainRoute> {
       this._loopMode = loopMode;
     });
   }
+
+  void setFavourite(int index, bool? b) async {
+    if (!b!) {
+      bool success = await Api.unfavourite(_tracks[index]);
+      print("unfavourite " + success.toString());
+      if (success) {
+        setState(() {
+          _tracks[index].is_active = 0;
+        });
+      }
+    } else {
+      bool success = await Api.favourite(_tracks[index]);
+      print("favourite " + success.toString());
+      if (success) {
+        setState(() {
+          _tracks[index].is_active = 1;
+        });
+      }
+    }
+  }
 }
 
 /// Helper class that makes the relationship between
@@ -902,9 +876,7 @@ class TrackItem extends StatelessWidget {
     return Container(
         margin: const EdgeInsets.all(0.0),
         decoration: new BoxDecoration(
-          color: ((crt._currentTrack == l.oid && crt._vs == PlayContext.all ||
-                      crt._player.currentIndex == index &&
-                          crt._vs == PlayContext.playlist) &&
+          color: (crt._currentTrack == l.oid &&
                   crt._playingPlayList.id == crt._currentPlayList.id)
               ? Colors.blue[300]
               : index % 2 == 1
@@ -918,8 +890,8 @@ class TrackItem extends StatelessWidget {
                 width: 40.0,
                 child: Checkbox(
                     value: l.is_active == 1,
-                    onChanged: (b) {
-                      //l.is_active = b as bool;
+                    onChanged: (b) async {
+                      crt.setFavourite(index, b);
                     })),
             Container(
               child: Flexible(
@@ -934,7 +906,10 @@ class TrackItem extends StatelessWidget {
                             l.artist +
                                 " - " +
                                 l.name +
-                                l.playlist_index.toString() //+
+                                " " +
+                                l.playlist_index.toString() +
+                                " " +
+                                l.oid.toString() //+
                             //l.added_date.toString() //+
                             //l.file_path +
                             //"(" +

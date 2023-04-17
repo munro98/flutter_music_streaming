@@ -3,7 +3,9 @@ import 'dart:convert' show json, utf8;
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:sqflite/sqlite_api.dart';
 
+import 'AppDatabase.dart';
 import 'Track.dart';
 import 'Playlist.dart';
 import 'Settings.dart';
@@ -85,7 +87,7 @@ class Api {
 
     for (var d in jsonResponse['data']) {
       //var lData = d['data'];
-      print(d['artist']);
+      //print(d['artist'] + (d['is_active'].toString()));
 
       var artists = d['artists'];
       if (artists != null) {
@@ -95,13 +97,15 @@ class Api {
       var release_date = d['release_date'];
       if (release_date != null) {
         var dt = DateTime.parse(release_date);
-        print(dt.toString());
+        //print(dt.toString());
       }
 
       String keys = d['name'] + " " + d['artist'];
 
       Track track = new Track(d['name'], d['_id'], d['file_path'],
-          artist: d['artist'], search_keys: keys);
+          artist: d['artist'],
+          search_keys: keys,
+          is_active: d['is_active'] ? 1 : 0);
 
       tracks.add(track);
     }
@@ -150,5 +154,35 @@ class Api {
     //final jsonResponse = json.decode(httpRequest.body); //responseBody
 
     return httpRequest.body;
+  }
+
+  static Future<bool> favourite(Track t) async {
+    print("API.favourite:");
+
+    final httpRequest =
+        await http.post(Uri.http(Settings.url, 'api/track/favourite/' + t.id));
+
+    if (httpRequest.statusCode != HttpStatus.OK) {
+      throw Exception("Error http " + httpRequest.statusCode.toString());
+      //return false;
+    }
+
+    AppDatabase.favourite(t);
+    return true;
+  }
+
+  static Future<bool> unfavourite(Track t) async {
+    print("API.unfavourite:");
+
+    final httpRequest = await http
+        .post(Uri.http(Settings.url, 'api/track/unfavourite/' + t.id));
+
+    if (httpRequest.statusCode != HttpStatus.OK) {
+      throw Exception("Error http " + httpRequest.statusCode.toString());
+      //return false;
+    }
+
+    AppDatabase.unfavourite(t);
+    return true;
   }
 }

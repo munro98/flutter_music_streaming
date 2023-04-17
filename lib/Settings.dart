@@ -21,6 +21,23 @@ class Settings {
 
   // must be set when changing the url
   static String urlHTTP = "http://192.168.50.21:3000/";
+
+  static Future<void> loadFromPrefs() async {
+    print("Settings.loadFromPrefs");
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    String? urlS = prefs.getString('url');
+    if (urlS != null) {
+      Settings.url = urlS;
+    }
+    String? urlHTTPStr = prefs.getString('urlHTTP');
+    if (urlHTTPStr != null) {
+      Settings.urlHTTP = urlHTTPStr;
+    }
+
+    print("Settings.loadFromPrefs: " + Settings.url);
+    print("Settings.loadFromPrefs: " + Settings.urlHTTP);
+  }
 }
 
 class SettingsRoute extends StatefulWidget {
@@ -50,6 +67,10 @@ class SettingsRouteState extends State<SettingsRoute> {
         _urlController.text = urlS;
         Settings.url = urlS;
       }
+      String? urlHTTPStr = prefs.getString('urlHTTP');
+      if (urlHTTPStr != null) {
+        Settings.urlHTTP = urlHTTPStr;
+      }
       String? userS = prefs.getString('user');
       if (userS != null) {
         _userController.text = userS;
@@ -71,6 +92,13 @@ class SettingsRouteState extends State<SettingsRoute> {
     prefs.setString('url', _urlController.text).then((bool success) {});
     prefs.setString('user', _userController.text);
     prefs.setString('password', _passwordController.text);
+
+    Settings.url = _urlController.text;
+    Settings.urlHTTP = "http://" + _urlController.text;
+    prefs.setString('urlHTTP', Settings.urlHTTP).then((bool success) {});
+
+    print("Settings._saveSettings: " + Settings.url);
+    print("Settings._saveSettings: " + Settings.urlHTTP);
   }
 
   @override

@@ -24,7 +24,7 @@ class VolumeBarState extends State<VolumeBar> with TickerProviderStateMixin {
   //late AnimationController controller;
 
   final MainRouteState crt;
-  double progressValue = 0.0;
+  double progressValue = 1.0;
   VolumeBarState(this.crt);
 
   @override

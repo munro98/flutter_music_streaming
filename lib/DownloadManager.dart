@@ -74,6 +74,7 @@ class DownloadManager {
       } else {
         //download
         var url = Settings.urlHTTP + "/api/track/" + track.id;
+        print("DownloadManager.downloadTrack: downloading from: " + url);
         var id = await FlutterDownloader.enqueue(
           url: url,
           savedDir: saveDir,

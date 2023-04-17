@@ -1,29 +1,25 @@
 import 'dart:collection';
+import 'dart:developer';
 import 'dart:math';
 import 'dart:isolate';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:flutter/widgets.dart';
-
-import 'package:http/http.dart';
 import 'package:path/path.dart' as path_lib;
 
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
 import 'package:dart_vlc/dart_vlc.dart' as VLC hide Playlist;
+import 'package:mutex/mutex.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 
 import 'package:android_path_provider/android_path_provider.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 import 'DownloadManager.dart';
 import 'Settings.dart';
 import 'Track.dart';
 import 'AppDatabase.dart';
-import 'API.dart';
 import 'Playlist.dart';
 import 'MainRoute.dart';
 import 'FileUtil.dart';
@@ -44,6 +40,48 @@ enum SortOrder {
 
 enum LoopMode { none, all, one }
 
+/* class AudioPlayerService extends Service {
+  final AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
+
+  @override
+  void onCreate() {
+    super.onCreate();
+    // Set up your audio player here
+    // assetsAudioPlayer.open(Audio.file('path/to/audio/file.mp3'));
+  }
+
+  @override
+  int onStartCommand(Intent intent, int flags, int startId) {
+    // Listen for the playlistAudioFinished event
+    assetsAudioPlayer.playlistAudioFinished.listen((Playing playing) {
+      // Call the skipNext function when the event is triggered
+      //skipNext(false);
+    });
+
+    // Start the service in the foreground and show a notification
+    final Notification notification = Notification(
+      title: 'Audio Player',
+      text: 'Playing music',
+      icon: Icons.music_note,
+    );
+    startForeground(1, notification);
+
+    // Return START_STICKY to indicate that the service should be restarted if it is killed
+    return START_STICKY;
+  }
+
+  @override
+  void onDestroy() {
+    super.onDestroy();
+    // Stop listening for the playlistAudioFinished event and release the audio player
+    assetsAudioPlayer.playlistAudioFinished.removeAllListeners();
+    assetsAudioPlayer.dispose();
+  }
+
+  @override
+  IBinder onBind(Intent intent) => null;
+} */
+
 class Player {
   static int maxShufflePlayed = 32;
 
@@ -55,26 +93,31 @@ class Player {
 
   AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
   VLC.Player? vlcPlayer;
+  StreamSubscription<VLC.PlaybackState>? vlcSS;
+  StreamSubscription<VLC.PositionState>? vlcPS;
 
   Playlist? currentPlaylist;
-  PlayContext _playContext = PlayContext.all;
+  //PlayContext _playContext = PlayContext.all;
   SortOrder _sortOrder = SortOrder.playlist;
 
-  List<Track> _tracks = []; // Playlists are stored here
+  List<Track> _tracks = [];
+
   List<Track> _shuffleTracks = [];
   Queue<String> _shufflePlayed = new Queue();
 
-  ReceivePort _port = ReceivePort();
+  //ReceivePort _port = ReceivePort();
 
   Track? current;
   Duration currentDuration = new Duration();
   int currentIndex = 0;
-  int _trackCount = 0;
+  //int _trackCount = 0;
 
   LoopMode loopMode = LoopMode.none;
   bool isShuffle = false;
   late bool _permissionReady;
   bool ignoreStop = false;
+
+  final skipMutex = Mutex();
 
   void init(Playlist playlist) {
     currentPlaylist = playlist;
@@ -100,65 +143,61 @@ class Player {
         crt.updateSeekBar(fraction);
       });
 
-      assetsAudioPlayer.playlistAudioFinished.listen((Playing playing) async {
+      assetsAudioPlayer.playlistAudioFinished.listen((Playing playing) {
         if (assetsAudioPlayer.playerState.value == PlayerState.play) {
           print("Player: music finished play");
         } else if (assetsAudioPlayer.playerState.value == PlayerState.pause) {
         } else if (assetsAudioPlayer.playerState.value == PlayerState.stop) {
           print("Player: music finished stopped");
-          if (!ignoreStop) {
-            ignoreStop = true;
-            await skipNext(false);
-            ignoreStop = false;
-          }
+          skipNext(false);
         }
         //if (assetsAudioPlayer.isPlaying.value) {
         //  skip_next();
         //}
       });
     } else if (Platform.isWindows || Platform.isLinux) {
-      // VLC initialization
       vlcPlayer = VLC.Player(id: 69420, commandlineArguments: ['--no-video']);
-
-      vlcPlayer?.playbackStream.listen((VLC.PlaybackState state) async {
+      vlcSS = vlcPlayer?.playbackStream.listen((VLC.PlaybackState state) async {
         //state.isPlaying;
         //state.isSeekable;
         //state.isCompleted;
         if (state.isCompleted) {
           print("VLCPlayer: music finished play");
-          if (!ignoreStop) {
-            ignoreStop = true;
-            await skipNext(false);
-            ignoreStop = false;
-          }
+
+          skipNext(false);
         } else if (state.isPlaying) {
-          print("VLCPlayer: state.isPlaying");
+          //print("VLCPlayer: state.isPlaying");
           crt.playerPlayCallback();
         } else if (!state.isPlaying) {
-          print("VLCPlayer: !state.isPlaying");
+          //print("VLCPlayer: !state.isPlaying");
           crt.playerPausedCallback();
         }
       });
 
-      vlcPlayer?.currentStream.listen((VLC.CurrentState state) {
+      /* vlcPlayer?.currentStream.listen((VLC.CurrentState state) {
         //state.index;
         //state.media;
         //state.medias;
         //state.isPlaylist;
-      });
-
-      vlcPlayer?.positionStream.listen((position) {
+      }); */
+      vlcPS = vlcPlayer?.positionStream.listen((position) {
         //print(position.duration?.inMilliseconds.toString());
         Duration? trackDuration = position.duration;
         double fraction = position.position! / trackDuration!;
         crt.updateSeekBar(fraction);
       });
     }
-
-    //_permissionReady = false;
-    //_isLoading = true;
-
     FileUtil.preparePermissions();
+  }
+
+  void unInit() {
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+      assetsAudioPlayer.dispose();
+    } else if (Platform.isWindows || Platform.isLinux) {
+      vlcSS!.cancel();
+      vlcPS!.cancel();
+      vlcPlayer!.dispose();
+    }
   }
 
   void addToShuffleHistory(Track t) {
@@ -167,7 +206,7 @@ class Player {
       while (_shufflePlayed.length > maxShufflePlayed) {
         _shufflePlayed.removeFirst();
       }
-      if (_shufflePlayed.length >= _trackCount) {
+      if (_shufflePlayed.length >= _tracks.length) {
         _shufflePlayed = new Queue();
       }
     }
@@ -176,134 +215,88 @@ class Player {
   Future<Track?> getNextTrack(bool userInvoked) async {
     Track c = current as Track;
 
-    if (current != null) {
-      if (loopMode == LoopMode.one) {
-        if (userInvoked) {
-          this.loopMode = LoopMode.all;
-          crt.setLoopModeCallback(this.loopMode);
-        } else {
-          return current;
-        }
-      }
-      if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
-        if (!isShuffle) {
-          if (currentIndex >= _tracks.length) {
-            currentIndex = 0;
-          } else {
-            currentIndex = currentIndex + 1;
-          }
-          return _tracks[currentIndex];
-        } else {
-          addToShuffleHistory(c);
-          print("Player.getNextTrack: shuffle len " +
-              _shufflePlayed.length.toString());
-
-          Track next = await AppDatabase.fetchNextTrackShuffle(
-              c.oid as String, _shufflePlayed);
-          print("" + next.name);
-          return next;
-        }
-      } else if (currentPlaylist!.id == "#FAV#") {
-        if (!isShuffle) {
-          if (currentIndex >= _tracks.length) {
-            currentIndex = 0;
-          } else {
-            currentIndex = currentIndex + 1;
-          }
-          return _tracks[currentIndex];
-        } else {
-          addToShuffleHistory(c);
-          Track next = await AppDatabase.fetchNextTrackShuffleFav(
-              c.oid as String, _shufflePlayed);
-          print("" + next.name);
-          return next;
-        }
+    if (loopMode == LoopMode.one) {
+      if (userInvoked) {
+        this.loopMode = LoopMode.all;
+        crt.setLoopModeCallback(this.loopMode);
       } else {
-        if (isShuffle) {
-          var t = _shuffleTracks[currentIndex];
-          currentIndex = currentIndex + 1;
-          if (currentIndex > _shuffleTracks.length) {
-            currentIndex = 0;
-            _shuffleTracks = _tracks;
-            _shuffleTracks.shuffle();
-          }
-          return t;
-        } else {
-          print("" + currentIndex.toString() + " " + _tracks.length.toString());
-          if (currentIndex >= _tracks.length) {
-            currentIndex = 0;
-          } else {
-            currentIndex = currentIndex + 1;
-          }
-          return _tracks[currentIndex];
-        }
+        return current;
       }
     }
-    throw Exception();
+    if (!isShuffle) {
+      print("" + currentIndex.toString() + " " + _tracks.length.toString());
+      if (currentIndex >= _tracks.length) {
+        currentIndex = 0;
+      } else {
+        currentIndex = currentIndex + 1;
+      }
+      print("NEW INDEX " +
+          currentIndex.toString() +
+          " " +
+          _tracks[currentIndex].name);
+      return _tracks[currentIndex];
+    } else {
+      if (currentPlaylist!.id == "#ALL#") {
+        addToShuffleHistory(c);
+        Track next = await AppDatabase.fetchNextTrackShuffle(
+            c.oid as String, _shufflePlayed);
+        print("" + next.name);
+        return next;
+      } else if (currentPlaylist!.id == "#FAV#") {
+        addToShuffleHistory(c);
+        Track next = await AppDatabase.fetchNextTrackShuffleFav(
+            c.oid as String, _shufflePlayed);
+        return next;
+      } else {
+        if (currentIndex >= _tracks.length) {
+          currentIndex = 0;
+        } else {
+          currentIndex = currentIndex + 1;
+        }
+        return _tracks[currentIndex];
+      }
+    }
   }
 
   Future<Track?> getPrevTrack(bool userInvoked) async {
     Track c = current as Track;
-    if (current != null) {
-      if (loopMode == LoopMode.one) {
-        if (userInvoked) {
-          this.loopMode = LoopMode.all;
-          crt.setLoopModeCallback(this.loopMode);
-        } else {
-          return current;
-        }
-      }
-      if (currentPlaylist == null || currentPlaylist!.id == "#ALL#") {
-        if (!isShuffle) {
-          print("" + currentIndex.toString() + " " + _tracks.length.toString());
-          if (currentIndex <= 0) {
-            currentIndex = _tracks.length - 1;
-          } else {
-            currentIndex = currentIndex - 1;
-          }
-          return _tracks[currentIndex];
-        } else {
-          addToShuffleHistory(c);
-          Track next = await AppDatabase.fetchNextTrackShuffle(
-              c.oid as String, _shufflePlayed);
-          print("" + next.name);
-          return next;
-        }
-      } else if (currentPlaylist!.id == "#FAV#") {
-        if (!isShuffle) {
-          if (current != null) {
-            Track next = await AppDatabase.fetchPrevTrackFav(
-                c.oid as String, crt.getSortOrder());
-            return next;
-          }
-        } else {
-          addToShuffleHistory(c);
-          Track next = await AppDatabase.fetchNextTrackShuffleFav(
-              c.oid as String, _shufflePlayed);
-          return next;
-        }
+    if (loopMode == LoopMode.one) {
+      if (userInvoked) {
+        this.loopMode = LoopMode.all;
+        crt.setLoopModeCallback(this.loopMode);
       } else {
-        if (isShuffle) {
-          var t = _shuffleTracks[currentIndex];
-          currentIndex = currentIndex + 1;
-          if (currentIndex > _shuffleTracks.length) {
-            currentIndex = 0;
-            _shuffleTracks = _tracks;
-            _shuffleTracks.shuffle();
-          }
-          return t;
-        } else {
-          print("" + currentIndex.toString() + " " + _tracks.length.toString());
-          if (currentIndex <= 0) {
-            currentIndex = _tracks.length - 1;
-          } else {
-            currentIndex = currentIndex - 1;
-          }
-          return _tracks[currentIndex];
-        }
+        return current;
       }
     }
-    throw Exception();
+    if (!isShuffle) {
+      print("" + currentIndex.toString() + " " + _tracks.length.toString());
+      if (currentIndex <= 0) {
+        currentIndex = _tracks.length - 1;
+      } else {
+        currentIndex = currentIndex - 1;
+      }
+      return _tracks[currentIndex];
+    } else {
+      if (currentPlaylist!.id == "#ALL#") {
+        addToShuffleHistory(c);
+        Track next = await AppDatabase.fetchNextTrackShuffle(
+            c.oid as String, _shufflePlayed);
+        print("" + next.name);
+        return next;
+      } else if (currentPlaylist!.id == "#FAV#") {
+        addToShuffleHistory(c);
+        Track next = await AppDatabase.fetchNextTrackShuffleFav(
+            c.oid as String, _shufflePlayed);
+        return next;
+      } else {
+        if (currentIndex <= 0) {
+          currentIndex = _tracks.length - 1;
+        } else {
+          currentIndex = currentIndex - 1;
+        }
+        return _tracks[currentIndex];
+      }
+    }
   }
 
   void playOrPause() {
@@ -314,7 +307,7 @@ class Player {
     }
   }
 
-  void play(Track t, Playlist? p, int index, List<Track> track, int trackCount,
+  void play(Track t, Playlist? p, int index, List<Track> track,
       SortOrder sortOrder) async {
     if (p!.id != currentPlaylist?.id) {
       _shufflePlayed = new Queue();
@@ -323,7 +316,7 @@ class Player {
     currentPlaylist = p;
     currentIndex = index;
     _tracks = track;
-    _trackCount = trackCount;
+    //_trackCount = trackCount;
     _sortOrder = sortOrder;
 
     print("Player.play: " + t.name + ", " + t.oid.toString());
@@ -414,10 +407,8 @@ class Player {
       if (t != null) {
         print('Player.skip_next: ' + t.file_path);
         crt.setCurrentTrack(t);
-        if (current?.playlist_index != null)
-          crt.jumpTo(current?.playlist_index);
-        play(
-            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
+        if (t.playlist_index != null) crt.jumpTo(t.playlist_index);
+        play(t, currentPlaylist, currentIndex, _tracks, _sortOrder);
       }
     } catch (e) {
       print('Player.skip_next: error' + e.toString());
@@ -430,8 +421,7 @@ class Player {
     try {
       if (t != null) {
         crt.setCurrentTrack(t);
-        play(
-            t, currentPlaylist, currentIndex, _tracks, _trackCount, _sortOrder);
+        play(t, currentPlaylist, currentIndex, _tracks, _sortOrder);
       }
     } catch (e) {
       print('Player.skip_prev: error' + e.toString());
