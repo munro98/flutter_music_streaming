@@ -903,20 +903,28 @@ class TrackItem extends StatelessWidget {
                       child: new Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            l.artist +
+                            (Settings.setOffline && l.is_downloaded == 0
+                                    ? "(Offline) "
+                                    : "") +
+                                l.artist +
                                 " - " +
                                 l.name +
-                                " " +
+                                " "
+                            /* +
                                 l.playlist_index.toString() +
                                 " " +
-                                l.oid.toString() //+
+                                l.oid.toString() */ //+
                             //l.added_date.toString() //+
                             //l.file_path +
                             //"(" +
                             //l.oid.toString()
                             ,
                             style: new TextStyle(
-                                fontSize: 13, color: Colors.black),
+                                fontSize: 13,
+                                color:
+                                    Settings.setOffline && l.is_downloaded == 0
+                                        ? Color.fromARGB(100, 0, 0, 0)
+                                        : Colors.black),
                           )),
                       onPressed: () => {
                             crt.play(

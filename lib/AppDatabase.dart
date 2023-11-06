@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 
+import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -51,6 +53,97 @@ class AppDatabase {
             }));
 
     //*/
+  }
+
+  static Future<void> checkTrackIsDownloaded() async {
+    if (Platform.isAndroid) {
+      bool _permissionReady = await FileUtil.checkPermission();
+      if (_permissionReady) {
+        final Database db = await (database as Future<Database>);
+
+        final List<Map<String, dynamic>> maps =
+            await db.query('track', columns: ['rowid', '*']);
+
+        var externalStorageDirPath =
+            await AndroidPathProvider.musicPath + "/Whale Music";
+
+        for (var e in maps.where((e) => e['name'] == "Erase Me")) {
+          print("AppDatabase.checkTrackIsDownloaded: " + e.toString());
+        }
+
+        print("AppDatabase.checkTrackIsDownloaded" + maps.length.toString());
+
+        final List<Map<String, dynamic>> maps_mutable =
+            maps.map((e) => Map.of(e)).cast<Map<String, dynamic>>().toList();
+
+        await Future.wait(maps_mutable.map((e) async {
+          try {
+            //e['is_downloaded'] = 5;
+            //print("e['is_downloaded']" + e['is_downloaded'].toString());
+            final file = File('${externalStorageDirPath}/${e['file_path']}');
+            e['is_downloaded'] = await file.exists() ? 1 : 0;
+          } catch (e) {
+            print("AppDatabase.checkTrackIsDownloaded: " + e.toString());
+          }
+        }));
+        /* await Future.forEach(maps_mutable, (Map<String, dynamic> e) async {
+          try {
+            //final file = File('${externalStorageDirPath}/${e['file_path']}');
+            
+            //maps_mutable[]
+            //e['is_downloaded'] = await file.exists() ? 1 : 0;
+            //String isDl = await file.exists() ? "1" : "0";
+            //print(e['name'] + isDl);
+            //print(e['name'] + e['is_downloaded'].toString());
+          } catch (e) {
+            print("AppDatabase.checkTrackIsDownloaded: " + e.toString());
+          }
+        }); */
+
+        for (var e in maps_mutable.where((e) => e['name'] == "Erase Me")) {
+          /* print(
+              "shold happen after" + e['name'] + e['is_downloaded'].toString()); */
+          print("AppDatabase.checkTrackIsDownloaded: " + e.toString());
+        }
+
+        Batch batch = db.batch();
+        try {
+          maps_mutable.forEach((e) {
+            batch.insert(
+              'track',
+              e,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          });
+
+          await batch.commit(noResult: true);
+        } catch (e) {
+          print("AppDatabase.checkTrackIsDownloaded: " + e.toString());
+        }
+      }
+    }
+
+    /* Map<String, dynamic> map1 = {'name': "Hello", 'is_downloaded': 0};
+        final List<Map<String, dynamic>> maps = [map1];
+        await Future.wait(maps.map((e) async {
+          try {
+            e['is_downloaded'] = 5;
+            print("e['is_downloaded']" + e['is_downloaded'].toString());
+          } catch (e) {
+            print("AppDatabase.checkTrackIsDownloaded: " + e.toString());
+          }
+        }));
+      }
+    } */
+    //print(maps[0].toString());
+
+    /* maps.forEach((e) {
+      try {
+        final file = File('${externalStorageDirPath}/${e['file_path']}');
+
+        file.exists().then((value) => e['is_downloaded'] = value);
+      } catch (e) {}
+    }); */
   }
 
   static Future<void> insertTrackList(List<Track> tracks) async {
@@ -116,6 +209,8 @@ class AppDatabase {
         tracks[i].playlist_index = i;
         tracks[i].is_active = maps[i]['is_active'];
 
+        tracks[i].is_downloaded = maps[i]['is_downloaded'];
+
         if (maps[i]['added_date'] != null) {
           tracks[i].added_date = maps[i]['added_date'];
         }
@@ -160,6 +255,8 @@ class AppDatabase {
         tracks[i].oid = maps[i]['rowid'].toString();
         tracks[i].playlist_index = i;
         tracks[i].is_active = maps[i]['is_active'];
+
+        tracks[i].is_downloaded = maps[i]['is_downloaded'];
 
         if (maps[i]['added_date'] != null) {
           tracks[i].added_date = maps[i]['added_date'];
@@ -321,6 +418,8 @@ class AppDatabase {
         // WHAT: HOW DOES THIS EVEN WORK!!!!????
         tracks[i].oid = maps[i]['rowid'].toString();
         tracks[i].is_active = maps[i]['is_active'];
+
+        tracks[i].is_downloaded = maps[i]['is_downloaded'];
 
         if (maps[i]['added_date'] != null) {
           tracks[i].added_date = maps[i]['added_date'];

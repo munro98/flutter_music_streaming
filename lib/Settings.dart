@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_music_app/AppDatabase.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart';
@@ -18,6 +19,8 @@ class Settings {
   static String url = "192.168.50.21:3000";
   static String user = "";
   static String password = "";
+
+  static bool setOffline = false;
 
   // must be set when changing the url
   static String urlHTTP = "http://192.168.50.21:3000/";
@@ -54,12 +57,16 @@ class SettingsRouteState extends State<SettingsRoute> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _localLibraryController = TextEditingController();
 
+  late bool _setOffline;
+
   final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
 
   @override
   void initState() {
     // read the server url from the database
     super.initState();
+
+    _setOffline = Settings.setOffline;
 
     _prefs.then((prefs) {
       String? urlS = prefs.getString('url');
@@ -139,6 +146,24 @@ class SettingsRouteState extends State<SettingsRoute> {
                         minimumSize: const Size.fromHeight(50),
                       ),
                       onPressed: () => {_saveSettings()},
+                    ),
+                    Checkbox(
+                        value: _setOffline,
+                        onChanged: (bool? val) => {
+                              setState(() {
+                                _setOffline = val!;
+                              }),
+                              Settings.setOffline = _setOffline,
+                              print("Settings.setOffline: " +
+                                  Settings.setOffline.toString())
+                            }),
+                    TextButton(
+                      child: Text("Test"),
+                      style: TextButton.styleFrom(
+                        primary: Color.fromARGB(255, 88, 134, 34),
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                      onPressed: () => {AppDatabase.checkTrackIsDownloaded()},
                     )
                   ]))),
     );
