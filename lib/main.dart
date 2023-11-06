@@ -30,7 +30,7 @@ import 'AppDatabase.dart';
 const debug = true;
 void main() async {
   if (Platform.isAndroid || Platform.isIOS) {
-    await FlutterDownloader.initialize(debug: debug);
+    await FlutterDownloader.initialize(debug: debug, ignoreSsl: true);
   }
   if (Platform.isWindows || Platform.isLinux) {
     // Initialize FFI

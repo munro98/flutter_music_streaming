@@ -60,29 +60,34 @@ class DownloadManager {
   }
 
   static void downloadTrack(Track track) async {
-    var permissionReady = await FileUtil.preparePermissions();
-    if (permissionReady) {
-      var saveDir = await FileUtil.prepTrackDir(track);
+    try {
+      var permissionReady = await FileUtil.preparePermissions();
+      if (permissionReady) {
+        var saveDir = await FileUtil.prepTrackDir(track);
 
-      var filePath = path_lib.join(saveDir, path_lib.basename(track.file_path));
-      print("downloading to: " + filePath);
+        var filePath =
+            path_lib.join(saveDir, path_lib.basename(track.file_path));
+        print("downloading to: " + filePath);
 
-      var checkDuplicate = File(filePath);
+        var checkDuplicate = File(filePath);
 
-      if (checkDuplicate.existsSync()) {
-        //do nothing
-      } else {
-        //download
-        var url = Settings.urlHTTP + "/api/track/" + track.id;
-        print("DownloadManager.downloadTrack: downloading from: " + url);
-        var id = await FlutterDownloader.enqueue(
-          url: url,
-          savedDir: saveDir,
-          fileName: path_lib.basename(track.file_path),
-          //showNotification: true,
-          //openFileFromNotification: true,
-        );
+        if (checkDuplicate.existsSync()) {
+          //do nothing
+        } else {
+          //download
+          var url = Settings.urlHTTP + "/api/track/" + track.id;
+          print("DownloadManager.downloadTrack: downloading from: " + url);
+          var id = await FlutterDownloader.enqueue(
+            url: url,
+            savedDir: saveDir,
+            fileName: path_lib.basename(track.file_path),
+            //showNotification: true,
+            //openFileFromNotification: true,
+          );
+        }
       }
+    } catch (e) {
+      print("DownloadManager:downloadTrack" + e.toString());
     }
   }
 }
