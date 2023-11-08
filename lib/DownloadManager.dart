@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path_lib;
 
 import 'dart:isolate';
@@ -32,6 +33,8 @@ class _ItemHolder {
 }
 
 class DownloadManager {
+  final log = Logger('DownloadManager');
+
   List<_TaskInfo>? _tasks;
   late List<_ItemHolder> _items;
 

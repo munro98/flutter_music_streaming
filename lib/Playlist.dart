@@ -3,6 +3,7 @@ import 'dart:convert' show json, jsonDecode, utf8;
 import 'dart:io';
 
 import 'package:assets_audio_player/assets_audio_player.dart';
+import 'package:logging/logging.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path_lib;
@@ -31,6 +32,8 @@ class Playlist {
 }
 
 class PlaylistManager {
+  static final log = Logger('PlaylistManager');
+
   static Future<bool> downloadPlaylists() async {
     try {
       List<Playlist> playlists = await Api.fetchPlaylists();

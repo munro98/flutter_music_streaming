@@ -3,6 +3,7 @@ import 'dart:convert' show json, utf8;
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:logging/logging.dart';
 import 'package:sqflite/sqlite_api.dart';
 
 import 'AppDatabase.dart';
@@ -45,6 +46,8 @@ class Api {
 
   }
   */
+
+  static final log = Logger('Api');
 
   static Future<List<String>> fetchPlaylistsTracks(String id) async {
     print("API.fetchPlaylistsTracks:");

@@ -38,7 +38,7 @@ class PlayPauseState extends State<PlayPause> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 10),
     )..addListener(() {
-        print("PlayPause: currentState = targetState;");
+        //print("PlayPause: currentState = targetState;");
         setState(() {
           currentState = targetState;
         });

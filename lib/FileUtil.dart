@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path_lib;
 
 import 'package:android_path_provider/android_path_provider.dart';
@@ -12,6 +13,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'Track.dart';
 
 class FileUtil {
+  static final log = Logger('FileUtil');
+
   static bool _permissionReady = false;
   static bool _isLoading = true;
   //static late String _localPath;

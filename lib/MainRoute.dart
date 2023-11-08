@@ -99,6 +99,8 @@ class MainRoute extends StatefulWidget {
 }
 
 class MainRouteState extends State<MainRoute> {
+  final log = Logger('MainRouteState');
+
   final Playlist allPlayList = new Playlist("All Music", "#ALL#");
   final Playlist favouritePlayList = new Playlist("Favourites", "#FAV#");
 

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_music_app/AppDatabase.dart';
+import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart';
@@ -16,6 +17,8 @@ import 'dart:ui';
 import 'widgets/TextFieldInput.dart';
 
 class Settings {
+  static final log = Logger('Settings');
+
   static String url = "192.168.50.21:3000";
   static String user = "";
   static String password = "";
@@ -26,7 +29,8 @@ class Settings {
   static String urlHTTP = "http://192.168.50.21:3000/";
 
   static Future<void> loadFromPrefs() async {
-    print("Settings.loadFromPrefs");
+    log.info("loadFromPrefs");
+
     final SharedPreferences prefs = await SharedPreferences.getInstance();
 
     String? urlS = prefs.getString('url');
@@ -38,8 +42,7 @@ class Settings {
       Settings.urlHTTP = urlHTTPStr;
     }
 
-    print("Settings.loadFromPrefs: " + Settings.url);
-    print("Settings.loadFromPrefs: " + Settings.urlHTTP);
+    log.info("Settings.url: " + Settings.url);
   }
 }
 
@@ -89,8 +92,6 @@ class SettingsRouteState extends State<SettingsRoute> {
         Settings.password = passwordS;
       }
     });
-
-    print("Settings.initState: Init settings state");
   }
 
   void _saveSettings() async {
