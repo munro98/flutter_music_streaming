@@ -35,13 +35,12 @@ class PlaylistManager {
     try {
       List<Playlist> playlists = await Api.fetchPlaylists();
 
-      // iterate each playlist and save it so local storage
+      // iterate each playlist and save it so local file storage
       playlists.forEach((el) async {
         String json = await Api.f(el.id);
 
-        //File file = File(path! + '/' + el.id + '.json');
         String? appDocPath = await FileUtil.getAppDocDir("/playlists");
-        //print(appDocDir);
+
         File file = File(appDocPath! + '/' + el.id + '.json');
         await file.writeAsString(json);
       });
@@ -52,7 +51,8 @@ class PlaylistManager {
     return new Future<bool>(() => true);
   }
 
-  //Note: requires Local SQLite database to be synced with server DB
+  //Note: needs local SQLite database to be synced with server DB
+  //
   static Future<bool> downloadTracksInPlaylists(Playlist p) async {
     try {
       String? appDocPath = await FileUtil.getAppDocDir("/playlists");
@@ -71,12 +71,10 @@ class PlaylistManager {
         Track track = await AppDatabase.fetchTrack(e['id']);
         print('path: ' + track.file_path);
 
-        ///*
         File trackPath = File(appMusicPath! + track.file_path);
         if (!trackPath.existsSync()) {
           PlaylistManager.download(track, appMusicPath);
         }
-        //*/
       });
     } catch (e) {
       print("PlaylistManager.downloadTracksInPlaylists: " + e.toString());

@@ -48,6 +48,8 @@ dependencies:
   sqflite_common_ffi: ^2.1.1+1
   sqlite3_flutter_libs: ^0.5.7
   mutex: ^3.0.1
+  connectivity_plus: ^5.0.1
+  logging: ^1.2.0
 
 dev_dependencies:
   flutter_test:

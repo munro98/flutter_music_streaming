@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:io';
 
 import 'package:android_path_provider/android_path_provider.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -15,6 +16,8 @@ import 'Track.dart';
 import 'Player.dart';
 
 class AppDatabase {
+  static final log = Logger('AppDatabase');
+
   static Future<Database>? database;
   static DatabaseFactory? databaseFactory;
 
@@ -181,10 +184,11 @@ class AppDatabase {
   static void syncDatabase() async {}
 
   static Future<List<Track>> fetchTracks() async {
-    print("AppDatabase.fetchTracks:");
-    // Get a reference to the database.
+    //print("AppDatabase.fetchTracks:");
+    log.info("fetchTracks");
 
     try {
+      // Get a reference to the database.
       final Database db = await (database as Future<Database>);
 
       // Query the table
@@ -224,10 +228,11 @@ class AppDatabase {
   }
 
   static Future<List<Track>> fetchTracksFavourites() async {
-    print("AppDatabase.fetchTracksFavourites:");
-    // Get a reference to the database.
+    //print("AppDatabase.fetchTracksFavourites:");
+    log.info("fetchTracksFavourites");
 
     try {
+      // Get a reference to the database.
       final Database db = await (database as Future<Database>);
 
       // Query the table

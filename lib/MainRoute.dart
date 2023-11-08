@@ -16,6 +16,9 @@ import 'package:android_path_provider/android_path_provider.dart';
 import 'package:path/path.dart' as path_lib;
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:logging/logging.dart';
+
 import 'dart:isolate';
 import 'dart:ui';
 
@@ -135,9 +138,17 @@ class MainRouteState extends State<MainRoute> {
   final ItemPositionsListener itemPositionsListener =
       ItemPositionsListener.create();
 
+  late StreamSubscription<ConnectivityResult> connectivity_subscription;
+
   @override
   void initState() {
     super.initState();
+
+    connectivity_subscription = Connectivity()
+        .onConnectivityChanged
+        .listen((ConnectivityResult result) {
+      // Got a new connectivity status!
+    });
 
     Settings.loadFromPrefs();
 
@@ -211,6 +222,8 @@ class MainRouteState extends State<MainRoute> {
     IsolateNameServer.removePortNameMapping('downloader_send_port');
 
     _player.unInit();
+
+    connectivity_subscription.cancel();
 
     super.dispose();
   }

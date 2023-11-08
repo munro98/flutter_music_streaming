@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 //import 'package:provider/provider.dart';
 import 'package:http/http.dart';
@@ -19,19 +20,39 @@ import 'dart:ui';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-//import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'package:dart_vlc/dart_vlc.dart' hide Playlist;
 
 import 'MainRoute.dart';
-import 'Settings.dart';
-import 'AppDatabase.dart';
 
 /////////////////////////////////
 const debug = true;
 void main() async {
+  // setup logging
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    //print('${record.level.name}: ${record.time}: ${record.message}');
+    // print blue colored message
+    if (record.level == Level.INFO) {
+      print(
+          '\x1B[34m${record.level.name}: ${record.time}: ${record.message}\x1B[0m');
+    } else if (record.level == Level.WARNING) {
+      // print yellow colored message
+      print(
+          '\x1B[33m${record.level.name}: ${record.time}: ${record.message}\x1B[0m');
+    } else if (record.level == Level.SEVERE) {
+      // print red colored message
+      print(
+          '\x1B[31m${record.level.name}: ${record.time}: ${record.message}\x1B[0m');
+    } else {
+      print('${record.level.name}: ${record.time}: ${record.message}');
+    }
+  });
+
+  // FlutterDownloader supports Android and IOS
   if (Platform.isAndroid || Platform.isIOS) {
     await FlutterDownloader.initialize(debug: debug, ignoreSsl: true);
   }
+
   if (Platform.isWindows || Platform.isLinux) {
     // Initialize FFI
     sqfliteFfiInit();

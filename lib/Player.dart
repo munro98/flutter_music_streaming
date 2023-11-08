@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path_lib;
 
 import 'package:assets_audio_player/assets_audio_player.dart' hide Playlist;
@@ -89,6 +90,7 @@ class Player {
     this.crt = crt;
   }
 
+  final log = Logger('Player');
   late MainRouteState crt;
 
   AssetsAudioPlayer assetsAudioPlayer = AssetsAudioPlayer();
@@ -390,6 +392,7 @@ class Player {
         }
       } catch (t) {
         print('Player.playFile: could not play!');
+        log.severe('Player.playFile: could not play!', t);
       }
     } else if (Platform.isWindows) {}
   }
